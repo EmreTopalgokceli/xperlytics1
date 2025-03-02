@@ -1,0 +1,111 @@
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { motion } from "framer-motion";
+
+export default function Home() {
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  
+  const categories = {
+    business: {
+      title: "Business Analytics",
+      services: {
+        "Marketing Analytics": {
+          description: "Gain deep insights into customer behavior and optimize marketing strategies.",
+          details: {
+            "Customer Segmentation": "Identify distinct customer groups based on data patterns and demographics.",
+            "CLTV Modeling": "Predict the long-term value of your customers for better decision-making.",
+            "Churn Analysis": "Detect early signals of customer attrition and implement retention strategies."
+          }
+        },
+        "Market Research": {
+          description: "Understand market trends and uncover growth opportunities.",
+          details: {
+            "Regional Market Analysis": "Evaluate market potential based on cost-of-living adjustments and economic indicators.",
+            "Workforce Flow Analysis": "Identify workforce migration patterns and labor market trends to optimize business strategies."
+          }
+        }
+      },
+    },
+    learning: {
+      title: "Learning Analytics",
+      services: {
+        "Student Performance Tracking": {
+          description: "Analyze student learning patterns and academic progress.",
+          details: {
+            "Performance Metrics": "Monitor grades, attendance, and engagement levels to improve student outcomes.",
+            "Predictive Analytics": "Identify students at risk of academic decline and develop intervention strategies."
+          }
+        }
+      },
+    },
+    technical: {
+      title: "Technical Services",
+      services: {
+        "Database Design": {
+          description: "Develop scalable and optimized databases for efficient data management.",
+          details: {
+            "Relational Database Structuring": "Design optimized schemas for business data.",
+            "Performance Tuning": "Enhance database speed and efficiency."
+          }
+        }
+      },
+    }
+  };
+
+  return (
+    <motion.div className="p-16 text-center bg-gray-50 min-h-screen text-gray-900" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+      <h1 className="text-5xl font-extrabold mb-8 text-gray-800">Xperlytics</h1>
+      <h2 className="text-xl font-medium mb-12 text-gray-600">Expertise in Analytics</h2>
+      
+      {!selectedCategory ? (
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
+          <h1 className="text-2xl font-semibold mb-8">Select a Section</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center">
+            {Object.keys(categories).map((key) => (
+              <motion.div whileHover={{ scale: 1.05 }} key={key}>
+                <Button className="w-full bg-blue-600 text-white hover:bg-blue-700 shadow-md rounded-lg px-6 py-3 text-lg font-medium" onClick={() => setSelectedCategory(key)}>
+                  {categories[key].title}
+                </Button>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      ) : !selectedService ? (
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }} className="max-w-4xl mx-auto">
+          <h1 className="text-3xl font-bold mb-8">{categories[selectedCategory].title}</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {Object.keys(categories[selectedCategory].services).map((service) => (
+              <motion.div whileHover={{ scale: 1.05 }} key={service}>
+                <Card onClick={() => setSelectedService(service)} className="cursor-pointer bg-white text-gray-800 shadow-lg hover:shadow-2xl transition rounded-lg">
+                  <CardContent className="p-8 font-semibold text-lg">{service}</CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+          <Button className="mt-8 bg-gray-500 hover:bg-gray-700 text-white rounded-lg px-6 py-3" onClick={() => setSelectedCategory(null)}>Back</Button>
+        </motion.div>
+      ) : !selectedDetail ? (
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
+          <h1 className="text-3xl font-bold mb-8">{selectedService}</h1>
+          <ul className="list-disc text-left max-w-md mx-auto text-gray-700 text-lg">
+            {Object.keys(categories[selectedCategory].services[selectedService].details).map((detail) => (
+              <motion.li key={detail} whileHover={{ scale: 1.05 }} className="mb-4 cursor-pointer text-blue-600 underline" onClick={() => setSelectedDetail(detail)}>{detail}</motion.li>
+            ))}
+          </ul>
+          <Button className="mt-6 bg-gray-500 hover:bg-gray-700 text-white rounded-lg px-6 py-3" onClick={() => setSelectedService(null)}>Back to Services</Button>
+          <Button className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-3" onClick={() => setSelectedCategory(null)}>Return to Main Page</Button>
+        </motion.div>
+      ) : (
+        <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.5 }}>
+          <h1 className="text-3xl font-bold mb-8">{selectedDetail}</h1>
+          <p className="mb-6 text-gray-700 text-lg">{categories[selectedCategory].services[selectedService].details[selectedDetail]}</p>
+          <Button className="mt-6 bg-gray-500 hover:bg-gray-700 text-white rounded-lg px-6 py-3" onClick={() => setSelectedDetail(null)}>Back to {selectedService}</Button>
+          <Button className="mt-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-6 py-3" onClick={() => setSelectedCategory(null)}>Return to Main Page</Button>
+        </motion.div>
+      )}
+    </motion.div>
+  );
+}
