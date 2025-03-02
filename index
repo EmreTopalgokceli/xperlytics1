@@ -1,0 +1,148 @@
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+
+export default function Home() {
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  const [formSubmitted, setFormSubmitted] = useState(false);
+  
+  const categories = {
+    business: {
+      title: "Business Analytics",
+      services: {
+        "Marketing Analytics": {
+          description: "Gain deep insights into customer behavior and optimize marketing strategies.",
+          details: {
+            "Customer Segmentation": "Identify distinct customer groups based on data patterns and demographics.",
+            "CLTV Modeling": "Predict the long-term value of your customers for better decision-making.",
+            "Churn Analysis": "Detect early signals of customer attrition and implement retention strategies."
+          }
+        },
+        "Market Research": {
+          description: "Understand market trends and uncover growth opportunities.",
+          details: {
+            "Regional Market Analysis": "Evaluate market potential based on cost-of-living adjustments and economic indicators.",
+            "Workforce Flow Analysis": "Identify workforce migration patterns and labor market trends to optimize business strategies."
+          }
+        },
+        "Financial Forecasting": {
+          description: "Make informed financial decisions with predictive models.",
+          details: {
+            "Revenue Forecasting": "Anticipate future revenue streams with data-driven models and historical trend analysis.",
+            "Risk Assessment": "Evaluate financial risks and develop mitigation strategies based on statistical modeling."
+          }
+        }
+      },
+    },
+    learning: {
+      title: "Learning Analytics",
+      services: {
+        "Student Performance Tracking": {
+          description: "Analyze student learning patterns and academic progress.",
+          details: {
+            "Performance Metrics": "Monitor grades, attendance, and engagement levels to improve student outcomes.",
+            "Predictive Analytics": "Identify students at risk of academic decline and develop intervention strategies."
+          }
+        },
+        "Course Optimization": {
+          description: "Enhance course effectiveness using data insights.",
+          details: {
+            "Curriculum Analysis": "Identify content areas needing improvement based on student feedback and performance metrics.",
+            "Engagement Tracking": "Measure student interaction levels and participation to improve learning outcomes."
+          }
+        }
+      },
+    },
+    technical: {
+      title: "Technical Services",
+      services: {
+        "Database Design": {
+          description: "Develop scalable and optimized databases for efficient data management.",
+          details: {
+            "Relational Database Structuring": "Design optimized schemas for business data.",
+            "Performance Tuning": "Enhance database speed and efficiency."
+          }
+        },
+        "Dashboard Development": {
+          description: "Create interactive dashboards for real-time decision-making.",
+          details: {
+            "Business Intelligence Dashboards": "Build visualization tools for business insights.",
+            "Custom KPI Tracking": "Tailor dashboards to monitor key performance indicators."
+          }
+        },
+        "Cloud Solutions": {
+          description: "Leverage cloud computing for secure and scalable data processing.",
+          details: {
+            "Cloud Migration": "Seamlessly transition data storage to cloud platforms.",
+            "Scalability Solutions": "Design cloud environments for dynamic business needs."
+          }
+        }
+      },
+    },
+    whyUs: {
+      title: "Why Xperlytics?",
+      description: "Discover why Xperlytics is the best choice for data-driven solutions.",
+      points: [
+        "Expert team with extensive experience in analytics and data science.",
+        "Tailored solutions to meet business-specific needs.",
+        "Cutting-edge technology and methodologies.",
+        "Proven track record of helping businesses achieve their goals."
+      ]
+    }
+  };
+
+  return (
+    <div className="p-10 text-center bg-gray-100 min-h-screen">
+      <h1 className="text-4xl font-bold text-blue-700 mb-4">Xperlytics</h1>
+      <h2 className="text-xl font-semibold text-gray-700 mb-6">Expertise in Analytics</h2>
+      
+      {!selectedCategory ? (
+        <div>
+          <h1 className="text-3xl font-bold mb-6 text-blue-700">Select a Section</h1>
+          <div className="flex justify-center gap-4">
+            {Object.keys(categories).map((key) => (
+              <Button key={key} className="bg-blue-500 text-white hover:bg-blue-700" onClick={() => setSelectedCategory(key)}>
+                {categories[key].title}
+              </Button>
+            ))}
+          </div>
+        </div>
+      ) : !selectedService ? (
+        <div>
+          <h1 className="text-3xl font-bold mb-4 text-blue-700">{categories[selectedCategory].title}</h1>
+          <div className="grid gap-4">
+            {Object.keys(categories[selectedCategory].services).map((service) => (
+              <Card key={service} onClick={() => setSelectedService(service)} className="cursor-pointer bg-white shadow-md hover:shadow-lg transition">
+                <CardContent className="p-4 text-gray-800 font-semibold">{service}</CardContent>
+              </Card>
+            ))}
+          </div>
+          <Button className="mt-6 bg-red-500 text-white hover:bg-red-700" onClick={() => setSelectedCategory(null)}>Back</Button>
+          <Button className="mt-4 bg-blue-500 text-white hover:bg-blue-700" onClick={() => setSelectedCategory(null)}>Return to Main Page</Button>
+        </div>
+      ) : !selectedDetail ? (
+        <div>
+          <h1 className="text-3xl font-bold mb-4 text-blue-700">{selectedService}</h1>
+          <ul className="list-disc text-left max-w-md mx-auto text-gray-700">
+            {Object.keys(categories[selectedCategory].services[selectedService].details).map((detail, index) => (
+              <li key={index} className="mb-2 cursor-pointer text-blue-600 hover:underline" onClick={() => setSelectedDetail(detail)}>{detail}</li>
+            ))}
+          </ul>
+          <Button className="mt-4 bg-gray-500 text-white hover:bg-gray-700" onClick={() => setSelectedService(null)}>Back to Services</Button>
+          <Button className="mt-4 bg-blue-500 text-white hover:bg-blue-700" onClick={() => setSelectedCategory(null)}>Return to Main Page</Button>
+        </div>
+      ) : (
+        <div>
+          <h1 className="text-3xl font-bold mb-4 text-blue-700">{selectedDetail}</h1>
+          <p className="mb-4 text-gray-700">{categories[selectedCategory].services[selectedService].details[selectedDetail]}</p>
+          <Button className="mt-4 bg-gray-500 text-white hover:bg-gray-700" onClick={() => setSelectedDetail(null)}>Back to {selectedService}</Button>
+          <Button className="mt-4 bg-blue-500 text-white hover:bg-blue-700" onClick={() => setSelectedCategory(null)}>Return to Main Page</Button>
+        </div>
+      )}
+    </div>
+  );
+}
