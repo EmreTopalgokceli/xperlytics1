@@ -1,3 +1,53 @@
+import pandas as pd
+
+# Örnek: df = ['cust_id', 'date', 'transaction_amt', 'transaction_cnt', 'churn']
+# date -> YYYYMM formatında
+
+# 1. Tarihi datetime'a çevir
+df['date'] = pd.to_datetime(df['date'], format='%Y%m')
+
+# 2. Her müşteri için referans tarihi seç (örnek: churn label tarihi - 1 ay)
+ref_dates = df.groupby('cust_id')['date'].max().reset_index()
+ref_dates.columns = ['cust_id', 'ref_date']
+
+# 3. Özellik üretme fonksiyonu
+def create_features(group):
+    group = group.sort_values('date')
+    ref_date = group['date'].max()
+
+    # Son 1 ay
+    last_1m = group[group['date'] > ref_date - pd.DateOffset(months=1)]['transaction_amt'].sum()
+
+    # Son 3 ay ortalaması
+    mean_3m = group[group['date'] > ref_date - pd.DateOffset(months=3)]['transaction_amt'].mean()
+
+    # Son 6 ay ortalaması
+    mean_6m = group[group['date'] > ref_date - pd.DateOffset(months=6)]['transaction_amt'].mean()
+
+    # Oran
+    ratio_1m_3m = last_1m / mean_3m if mean_3m and not pd.isna(mean_3m) else 0
+
+    # Fark (son ay - önceki ay)
+    last_month_val = group[group['date'] == ref_date]['transaction_amt'].sum()
+    prev_month_val = group[group['date'] == ref_date - pd.DateOffset(months=1)]['transaction_amt'].sum()
+    diff_1m_prev = last_month_val - prev_month_val
+
+    return pd.Series({
+        'last_1m_amt': last_1m,
+        'mean_3m_amt': mean_3m,
+        'mean_6m_amt': mean_6m,
+        'ratio_1m_3m_amt': ratio_1m_3m,
+        'diff_1m_prev_amt': diff_1m_prev
+    })
+
+# 4. Uygulama
+features = df.groupby('cust_id').apply(create_features).reset_index()
+
+# 5. Churn label ile birleştir
+final_df = features.merge(df[['cust_id', 'churn']].drop_duplicates(), on='cust_id', how='left')
+
+
+
 import numpy as np
 import pandas as pd
 from math import ceil, floor
