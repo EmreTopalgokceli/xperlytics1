@@ -1,44 +1,44 @@
-import pandas as pd
-import numpy as np
+# İlişkili kolon çiftleri
+paired_cols = [
+    ('cc_transaction_all_amt', 'cc_transaction_all_cnt'),
+    ('mobile_eft_all_amt', 'mobile_eft_all_cnt')
+]
 
-def inject_nulls(train_df, test_df, 
-                 null_cols=['kredi_karti', 'eft'], 
-                 null_frac=0.05, 
-                 cut_history_frac=0.03, 
-                 random_state=42):
-    """
-    train ve test setine NaN ekler:
-    1. Belirli kolonları rastgele müşteri alt kümesinde NaN yapar
-    2. Bazı müşterilerin geçmiş kayıtlarını NaN ile keser
-    """
+def inject_nulls_with_pairs(train_df, test_df,
+                            paired_cols,
+                            null_frac=0.05,
+                            cut_history_frac=0.03,
+                            random_state=42):
+
     np.random.seed(random_state)
     
     def apply_nulls(df):
         df = df.copy()
-        
-        # 1️⃣ Bazı müşterilerin belirli kolonlarını NaN yap
         unique_ids = df['cust_id'].unique()
-        target_ids = np.random.choice(unique_ids, 
-                                      size=int(len(unique_ids)*null_frac), 
-                                      replace=False)
-        df.loc[df['cust_id'].isin(target_ids), null_cols] = np.nan
         
-        # 2️⃣ Bazı müşterilerin geçmişini kes (lag zincirini bozmak için)
-        cut_ids = np.random.choice(unique_ids, 
-                                   size=int(len(unique_ids)*cut_history_frac), 
+        # 1️⃣ Rastgele müşteri alt kümesinde tüm çiftleri NaN yap
+        target_ids = np.random.choice(unique_ids,
+                                      size=int(len(unique_ids) * null_frac),
+                                      replace=False)
+        for col1, col2 in paired_cols:
+            df.loc[df['cust_id'].isin(target_ids), [col1, col2]] = np.nan
+
+        # 2️⃣ Geçmiş kesme
+        cut_ids = np.random.choice(unique_ids,
+                                   size=int(len(unique_ids) * cut_history_frac),
                                    replace=False)
         for cid in cut_ids:
             cust_dates = sorted(df.loc[df['cust_id'] == cid, 'date'].unique())
-            if len(cust_dates) > 3:  # çok kısa geçmişi olanları atla
-                cut_point = np.random.choice(cust_dates[1:-1])  # ilk/son ayı kesme
-                df.loc[(df['cust_id'] == cid) & (df['date'] <= cut_point), null_cols] = np.nan
-        
+            if len(cust_dates) > 3:
+                cut_point = np.random.choice(cust_dates[1:-1])
+                for col1, col2 in paired_cols:
+                    df.loc[(df['cust_id'] == cid) & (df['date'] <= cut_point),
+                           [col1, col2]] = np.nan
+
         return df
 
-    train_null = apply_nulls(train_df)
-    test_null = apply_nulls(test_df)
-    
-    return train_null, test_null
+    return apply_nulls(train_df), apply_nulls(test_df)
+
 
 # Örnek kullanım
 train_df = pd.read_csv("train.csv")
