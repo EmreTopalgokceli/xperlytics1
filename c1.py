@@ -1,3 +1,94 @@
+import numpy as np
+import pandas as pd
+from math import ceil, floor
+
+# İlişkili kolon çiftleri (gruplar)
+cc_pairs  = [('cc_transaction_all_amt', 'cc_transaction_all_cnt')]
+eft_pairs = [('mobile_eft_all_amt', 'mobile_eft_all_cnt')]
+
+def inject_nulls_simple(train_df, test_df,
+                        cc_pairs, eft_pairs,
+                        frac_cc_null=0.05,       # sadece CC çiftleri NaN atanacak müşteri oranı
+                        frac_eft_null=0.05,      # sadece EFT çiftleri NaN atanacak müşteri oranı
+                        cut_history_frac=0.03,   # geçmişi kesilecek müşteri oranı
+                        min_cut_ratio=0.10,      # kesilecek dönem sayısı: N*min_cut_ratio ..
+                        max_cut_ratio=0.30,      # .. N*max_cut_ratio arasında rastgele
+                        random_state=42):
+    np.random.seed(random_state)
+
+    all_pairs = cc_pairs + eft_pairs  # geçmiş kesmede tüm çiftler kesilecek
+
+    def apply_nulls(df):
+        df = df.copy()
+        ids = df['cust_id'].unique()
+        n = len(ids)
+
+        # 1) CC-only ve EFT-only müşterileri seç (disjoint)
+        k_cc  = int(n * frac_cc_null)
+        cc_ids = set(np.random.choice(ids, size=k_cc, replace=False))
+        remain = np.array([i for i in ids if i not in cc_ids])
+        k_eft = int(n * frac_eft_null)
+        eft_ids = set(np.random.choice(remain, size=min(k_eft, len(remain)), replace=False))
+
+        # 2) CC-only: CC çiftlerini komple NaN
+        for a, c in cc_pairs:
+            df.loc[df['cust_id'].isin(cc_ids), [a, c]] = np.nan
+
+        # 3) EFT-only: EFT çiftlerini komple NaN
+        for a, c in eft_pairs:
+            df.loc[df['cust_id'].isin(eft_ids), [a, c]] = np.nan
+
+        # 4) Geçmiş kesme: bazı müşteriler için başlangıçtan L dönem kes (tüm çiftler)
+        k_cut = int(n * cut_history_frac)
+        cut_ids = np.random.choice(ids, size=min(k_cut, n), replace=False)
+
+        for cid in cut_ids:
+            dates = np.sort(df.loc[df['cust_id'] == cid, 'date'].unique())
+            N = len(dates)                 # >=12 varsayımı
+            L_min = max(1, ceil(min_cut_ratio * N))
+            L_max = min(N-1, floor(max_cut_ratio * N))
+            if L_min > L_max:
+                continue
+            L = np.random.randint(L_min, L_max + 1)  # [L_min, L_max]
+            cut_point = dates[L - 1]
+            mask = (df['cust_id'] == cid) & (df['date'] <= cut_point)
+            for a, c in all_pairs:
+                df.loc[mask, [a, c]] = np.nan
+
+        return df
+
+    return apply_nulls(train_df), apply_nulls(test_df)
+
+
+
+# CSV'lerini yükle
+train_df = pd.read_csv("train.csv")
+test_df  = pd.read_csv("test.csv")
+
+# İlişkili kolon çiftleri
+cc_pairs  = [('cc_transaction_all_amt', 'cc_transaction_all_cnt')]
+eft_pairs = [('mobile_eft_all_amt', 'mobile_eft_all_cnt')]
+
+# Fonksiyonu çağır
+train_null, test_null = inject_nulls_simple(
+    train_df, test_df,
+    cc_pairs=cc_pairs,
+    eft_pairs=eft_pairs,
+    frac_cc_null=0.05,      # %5 müşteri CC null
+    frac_eft_null=0.05,     # %5 müşteri EFT null
+    cut_history_frac=0.03,  # %3 müşteri geçmiş kesme
+    min_cut_ratio=0.10,     # kesilecek min oran
+    max_cut_ratio=0.30,     # kesilecek max oran
+    random_state=42
+)
+
+#########
+
+
+
+
+
+
 # İlişkili kolon çiftleri
 paired_cols = [
     ('cc_transaction_all_amt', 'cc_transaction_all_cnt'),
