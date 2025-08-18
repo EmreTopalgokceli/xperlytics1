@@ -1,4 +1,110 @@
 import numpy as np
+import pandas as pd
+from math import ceil, floor
+
+def inject_nulls(
+    df: pd.DataFrame,
+    groups: dict,
+    frac_nulls: dict,
+    cut_history_frac=0.03,
+    min_cut_ratio=0.10,
+    max_cut_ratio=0.30,
+    random_state=42,
+    cut_groups=None
+) -> pd.DataFrame:
+    rng = np.random.default_rng(random_state)
+    out = df.copy()
+    ids = out['cust_id'].unique()
+    n = len(ids)
+
+    used_ids = set()
+    for gname, cols_list in groups.items():
+        remain = [i for i in ids if i not in used_ids]
+        k = int(n * frac_nulls.get(gname, 0))
+        chosen = set(rng.choice(remain, size=min(k, len(remain)), replace=False))
+        used_ids |= chosen
+        for pair in cols_list:
+            cols = [pair] if isinstance(pair, str) else list(pair)
+            out.loc[out['cust_id'].isin(chosen), cols] = np.nan
+
+    remain1 = np.setdiff1d(ids, list(used_ids))
+    k_cut = int(n * cut_history_frac)
+    cut_ids = rng.choice(remain1, size=min(k_cut, len(remain1)), replace=False)
+
+    if cut_groups is None:
+        cut_groups = list(groups.keys())
+
+    for cid in cut_ids:
+        dates = np.sort(out.loc[out['cust_id'] == cid, 'date'].unique())
+        N = len(dates)
+        if N < 2:
+            continue
+        L_min = max(1, ceil(min_cut_ratio * N))
+        L_max = min(N-1, floor(max_cut_ratio * N))
+        if L_min > L_max:
+            continue
+        L = rng.integers(L_min, L_max + 1)
+        cut_point = dates[L - 1]
+
+        mask = (out['cust_id'] == cid) & (out['date'] <= cut_point)
+        gname = rng.choice(cut_groups)
+        cols_list = groups[gname]
+        for pair in cols_list:
+            cols = [pair] if isinstance(pair, str) else list(pair)
+            out.loc[mask, cols] = np.nan
+
+    return out
+
+
+
+
+from null_injection import inject_nulls_flexible
+
+groups = {
+    "cc": [("cc_transaction_all_amt","cc_transaction_all_cnt")],
+    "eft": ["mobile_eft_all_amt","mobile_eft_all_cnt"],
+    "xft": ["new_feature_amt"]
+}
+
+frac_nulls = {"cc": 0.05, "eft": 0.04, "xft": 0.02}
+
+df_null = inject_nulls_flexible(
+    df,
+    groups=groups,
+    frac_nulls=frac_nulls,
+    cut_history_frac=0.03,
+    min_cut_ratio=0.1,
+    max_cut_ratio=0.3,
+    cut_groups=["cc","eft"]
+)
+
+
+from null_injection import inject_nulls_flexible
+
+groups = {
+    "cc": [("cc_transaction_all_amt","cc_transaction_all_cnt")],
+    "eft": ["mobile_eft_all_amt","mobile_eft_all_cnt"],
+    "xft": ["new_feature_amt"]
+}
+
+frac_nulls = {"cc": 0.05, "eft": 0.04, "xft": 0.02}
+
+df_null = inject_nulls(
+    df,
+    groups=groups,
+    frac_nulls=frac_nulls,
+    cut_history_frac=0.03,
+    min_cut_ratio=0.1,
+    max_cut_ratio=0.3,
+    cut_groups=["cc","eft"]
+)
+
+
+########
+
+
+
+import numpy as np
 from math import ceil, floor
 
 # örnek eşleştirmeler
