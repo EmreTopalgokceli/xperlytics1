@@ -1,3 +1,35 @@
+def null_churn_report(df, groups, target="churn", id_col="cust_id", date_col="date"):
+    report = {}
+
+    # --- Kolon bazlı null oranları ---
+    for gname, cols_list in groups.items():
+        for pair in cols_list:
+            cols = [pair] if isinstance(pair, str) else list(pair)
+            for col in cols:
+                if col not in df.columns:
+                    continue
+                rates = df.groupby(target)[col].apply(lambda x: x.isna().mean())
+                report[col] = rates
+
+    # --- Cut history var mı? ---
+    # Mantık: Eğer bir müşteride tarihlere bakınca en eski birkaç kayıtta NaN varsa → cut uygulanmış
+    df_sorted = df.sort_values([id_col, date_col])
+    cut_flags = (
+        df_sorted.groupby(id_col)
+        .apply(lambda g: g.iloc[0: max(1, len(g)//4)].isna().any(axis=1).any())  # ilk %25 satırda null var mı
+        .astype(int)
+    )
+    cut_flags = cut_flags.rename("cut_applied").reset_index()
+
+    df_merge = df[[id_col, target]].drop_duplicates().merge(cut_flags, on=id_col, how="left")
+    rates = df_merge.groupby(target)["cut_applied"].mean()
+    report["cut_history"] = rates
+
+    return pd.DataFrame(report).T
+
+
+
+
 import numpy as np
 import pandas as pd
 from math import ceil, floor
