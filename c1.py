@@ -1,3 +1,75 @@
+import numpy as np
+from math import ceil, floor
+
+# örnek eşleştirmeler
+cc_pairs  = [('cc_transaction_all_amt',  'cc_transaction_all_cnt')]
+eft_pairs = [('mobile_eft_all_amt',      'mobile_eft_all_cnt')]
+
+def inject_nulls_simple(
+    df,
+    cc_pairs, eft_pairs,
+    frac_cc_null=0.05,
+    frac_eft_null=0.04,
+    cut_history_frac=0.03,
+    min_cut_ratio=0.10,
+    max_cut_ratio=0.30,
+    random_state=42
+):
+    np.random.seed(random_state)                 # 1) Tekrarlanabilirlik için RNG sabitle
+    df = df.copy()                               # 2) Yan etki olmasın diye kopya üzerinde çalış
+    ids = df['cust_id'].unique()                 # 3) Tüm müşteri ID’leri
+    n = len(ids)                                 # 4) Müşteri sayısı
+
+    # ---------- (A) CC için komple null müşteri seç ----------
+    k_cc = int(n * frac_cc_null)                 # 5) Kaç müşteride CC alanlarını sileceğiz
+    cc_ids = set(np.random.choice(ids, size=k_cc, replace=False))  # 6) Rastgele müşteri kümesi
+    for a, c in cc_pairs:                        # 7) CC çiftleri (tutar + adet gibi)
+        df.loc[df['cust_id'].isin(cc_ids), [a, c]] = np.nan  # 8) Seçilen müşterilerde CC sütunlarını NaN yap
+
+    # ---------- (B) EFT için komple null müşteri seç ----------
+    remain = [i for i in ids if i not in cc_ids] # 9) CC null olanları EFT seçiminden çıkar (ya CC ya EFT olsun)
+    k_eft = int(n * frac_eft_null)               # 10) Kaç müşteride EFT alanlarını sileceğiz
+    eft_ids = set(np.random.choice(remain, size=min(k_eft, len(remain)), replace=False))  # 11) Rastgele EFT kümesi
+    for a, c in eft_pairs:                       # 12) EFT çiftleri
+        df.loc[df['cust_id'].isin(eft_ids), [a, c]] = np.nan  # 13) Seçilen müşterilerde EFT sütunlarını NaN yap
+
+    # ---------- (C) GEÇMİŞİ BAŞTAN KIRP (başlangıç kısmını sil) ----------
+    remain1 = np.setdiff1d(ids, np.union1d(list(cc_ids), list(eft_ids)))  # 14) CC/EFT komple null yapılmayanlar
+    k_cut = int(n * cut_history_frac)            # 15) Kaç müşteride tarihsel kesim yapacağız
+    cut_ids = np.random.choice(remain1, size=min(k_cut, len(remain1)), replace=False)  # 16) Kesilecek müşteriler
+
+    for cid in cut_ids:                           # 17) Her kesilecek müşteri için
+        dates = np.sort(df.loc[df['cust_id'] == cid, 'date'].unique())  # 18) Müşteri tarihleri (artan)
+        N = len(dates)                            # 19) Müşteri tarih sayısı
+        if N < 2:                                 # 20) 1 tarih varsa kesmeye gerek yok
+            continue
+
+        # 21) İlk L tarihi sileceğiz; L aralığını oranlarla belirliyoruz
+        L_min = max(1, ceil(min_cut_ratio * N))   # 22) En az kaç tarih silinsin (>=1)
+        L_max = min(N-1, floor(max_cut_ratio * N))# 23) En fazla kaç tarih silinsin (< N)
+        if L_min > L_max:                         # 24) Aralık uygunsuzsa atla
+            continue
+
+        L = np.random.randint(L_min, L_max + 1)   # 25) Silinecek erken dönem uzunluğu (tarih adedi)
+        cut_point = dates[L - 1]                  # 26) Sınır: L’inci en erken tarih
+
+        # 27) BAŞLANGICI SİL: cut_point ve ÖNCESİ NaN olacak
+        mask = (df['cust_id'] == cid) & (df['date'] <= cut_point)
+
+        # 28) Her müşteri için ya CC ya EFT kırpılsın (ikisi birden değil)
+        selected_pairs = cc_pairs if np.random.rand() < 0.5 else eft_pairs
+
+        for a, c in selected_pairs:               # 29) Seçili çift sütunları başlangıç tarafında NaN yap
+            df.loc[mask, [a, c]] = np.nan
+
+    return df                                     # 30) Null’ları enjekte edilmiş veri setini döndür
+
+
+
+
+
+
+
 import pandas as pd
 
 # Örnek: df = ['cust_id', 'date', 'transaction_amt', 'transaction_cnt', 'churn']
