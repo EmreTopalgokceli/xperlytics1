@@ -1,3 +1,26 @@
+# val_blocks içinde stringler olsun
+val_blocks = [
+    ["2020-07", "2020-08", "2020-09"],
+    ["2020-10", "2020-11", "2020-12"]
+]
+
+for block in val_blocks:
+    # stringleri Period'e çevir
+    block_periods = pd.PeriodIndex(block, freq="M")
+
+    # date kolonunu da Period'e çevirip maskele
+    mask = train["date"].dt.to_period("M").isin(block_periods)
+
+    print(block, mask.sum())  # kaç gözlem seçildiğini göster
+
+    X_train, y_train = train.loc[~mask, features], train.loc[~mask, "churn"]
+    X_val,   y_val   = train.loc[ mask, features], train.loc[ mask, "churn"]
+
+    # ... model fit & evaluate ...
+
+
+
+
 import pandas as pd
 from catboost import CatBoostClassifier
 from sklearn.metrics import roc_auc_score, f1_score, precision_recall_curve
