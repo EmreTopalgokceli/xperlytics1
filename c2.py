@@ -6,6 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.model_selection import ParameterGrid
 from catboost import CatBoostClassifier
+from lightgbm import LGBMClassifier
 
 try:
     from xgboost import XGBClassifier
@@ -13,16 +14,19 @@ try:
 except Exception:
     _HAS_XGB = False
 
+
+
 def build_base_models(seed=42):
     models = {
         "cat": CatBoostClassifier(
             random_seed=seed, depth=6, learning_rate=0.05, n_estimators=1000,
             loss_function="Logloss", eval_metric="AUC", verbose=False
         ),
-        "logreg": Pipeline([
-            ("scaler", StandardScaler(with_mean=False)),
-            ("clf", LogisticRegression(max_iter=2000, n_jobs=None, C=1.0, random_state=seed))
-        ])
+        "lgbm": LGBMClassifier(
+            n_estimators=1500, max_depth=-1, subsample=0.8, colsample_bytree=0.8,
+            learning_rate=0.03, reg_lambda=1.0, objective="binary",
+            random_state=seed, n_jobs=-1
+        )
     }
     if _HAS_XGB:
         models["xgb"] = XGBClassifier(
