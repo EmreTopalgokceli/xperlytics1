@@ -1,5 +1,138 @@
 import numpy as np
 import pandas as pd
+from sklearn.metrics import roc_auc_score, f1_score, precision_recall_curve
+from catboost import CatBoostClassifier
+
+def train_cv_and_test(train, test, features, id_col, ratio=0.01, seed=42):
+    # 3 kez rolling window (son 9 ay)
+    months = train["date"].dt.to_period("M").drop_duplicates().sort_values().tolist()
+    last9 = months[-9:] if len(months) >= 9 else months
+    chunks = np.array_split(last9, 3)
+    cv_windows = [(pd.Timestamp(ch[0].start_time), pd.Timestamp(ch[-1].end_time)) for ch in chunks if len(ch)>0]
+
+    aucs, f1s, thrs = [], [], []
+
+    for i, (st, ed) in enumerate(cv_windows, 1):
+        tr = train[train["date"] < st]
+        va = train[(train["date"] >= st) & (train["date"] <= ed)]
+        if tr.empty or va.empty:
+            continue
+
+        X_tr, y_tr = tr[features], tr["churn"]
+        X_va, y_va = va[features], va["churn"]
+
+        model = CatBoostClassifier(random_seed=seed, verbose=0)
+        model.fit(X_tr, y_tr)
+
+        p_va = model.predict_proba(X_va)[:,1]
+
+        # --- threshold seçimi ---
+        # 1) üst %ratio (örneğin 0.01 = %1) pozitif olsun:
+        k = max(1, int(len(p_va)*ratio))
+        thr = np.partition(p_va, -k)[-k]
+        # 2) ya da F1-optimal istersen:
+        # prec, rec, thr_arr = precision_recall_curve(y_va, p_va)
+        # f1 = (2*prec*rec)/(prec+rec+1e-12); thr = thr_arr[np.nanargmax(f1)-1]
+
+        y_hat = (p_va >= thr).astype(int)
+        auc, f1 = roc_auc_score(y_va, p_va), f1_score(y_va, y_hat)
+
+        print(f"Fold {i} {st.date()}..{ed.date()} | AUC={auc:.4f} F1={f1:.4f} thr={thr:.4f}")
+        aucs.append(auc); f1s.append(f1); thrs.append(thr)
+
+    print("\nCV mean AUC:", np.mean(aucs), "mean F1:", np.mean(f1s))
+
+    # final model: full-train fit
+    X_full, y_full = train[features], train["churn"]
+    final_model = CatBoostClassifier(random_seed=seed, verbose=0)
+    final_model.fit(X_full, y_full)
+
+    # test tahmin
+    p_test = final_model.predict_proba(test[features])[:,1]
+    # aynı threshold mantığı (burada CV threshold ortalaması alındı)
+    thr_final = np.median(thrs) if thrs else 0.5
+    y_pred = (p_test >= thr_final).astype(int)
+
+    return pd.DataFrame({id_col: test[id_col].values, "y_pred": y_pred})
+
+
+
+#
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import roc_auc_score, f1_score, precision_recall_curve
+from catboost import CatBoostClassifier
+
+def _best_f1_threshold(y_true, y_prob):
+    # PR eğrisi → F1’i maksimize eden eşiği güvenli biçimde seç
+    prec, rec, thr_arr = precision_recall_curve(y_true, y_prob)
+    f1 = (2 * prec * rec) / (prec + rec + 1e-12)
+    i = int(np.nanargmax(f1))
+    if len(thr_arr) == 0:
+        return 0.5
+    return float(thr_arr[i-1]) if i > 0 else float(thr_arr[0])
+
+def train_cv_and_test_f1(train, test, features, id_col, seed=42):
+    # 3 kez rolling window (son 9 ayı 3 parçaya böl)
+    months = train["date"].dt.to_period("M").drop_duplicates().sort_values().tolist()
+    last9 = months[-9:] if len(months) >= 9 else months
+    chunks = np.array_split(last9, 3)
+    cv_windows = [(pd.Timestamp(ch[0].start_time), pd.Timestamp(ch[-1].end_time))
+                  for ch in chunks if len(ch) > 0]
+
+    aucs, f1s, thrs = [], [], []
+
+    for i, (st, ed) in enumerate(cv_windows, 1):
+        tr = train[train["date"] < st]
+        va = train[(train["date"] >= st) & (train["date"] <= ed)]
+        if tr.empty or va.empty:
+            continue
+
+        X_tr, y_tr = tr[features], tr["churn"]
+        X_va, y_va = va[features], va["churn"]
+
+        model = CatBoostClassifier(random_seed=seed, verbose=0)
+        model.fit(X_tr, y_tr)
+
+        p_va = model.predict_proba(X_va)[:, 1]
+
+        # --- threshold seçimi: F1-optimal ---
+        thr = _best_f1_threshold(y_va, p_va)
+
+        y_hat = (p_va >= thr).astype(int)
+        auc = roc_auc_score(y_va, p_va)
+        f1  = f1_score(y_va, y_hat)
+
+        print(f"Fold {i} {st.date()}..{ed.date()} | AUC={auc:.4f} F1={f1:.4f} thr={thr:.4f}")
+        aucs.append(auc); f1s.append(f1); thrs.append(thr)
+
+    print("\nCV mean AUC:", np.mean(aucs) if aucs else None,
+          "mean F1:", np.mean(f1s) if f1s else None)
+
+    # final model: full-train fit
+    X_full, y_full = train[features], train["churn"]
+    final_model = CatBoostClassifier(random_seed=seed, verbose=0)
+    final_model.fit(X_full, y_full)
+
+    # test tahmin + CV-medyan threshold ile etiket
+    p_test = final_model.predict_proba(test[features])[:, 1]
+    thr_final = float(np.median(thrs)) if thrs else 0.5
+    y_pred = (p_test >= thr_final).astype(int)
+
+    return pd.DataFrame({id_col: test[id_col].values, "y_pred": y_pred})
+
+
+pred_df = train_cv_and_test(train, test, features=feature_list, id_col="customer_id", ratio=0.01)
+print(pred_df.head())
+
+
+
+
+
+########
+import numpy as np
+import pandas as pd
 from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
