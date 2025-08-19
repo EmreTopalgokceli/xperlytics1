@@ -1,3 +1,101 @@
+import pandas as pd
+from catboost import CatBoostClassifier
+from sklearn.metrics import roc_auc_score, f1_score, precision_recall_curve
+
+train["date"] = pd.to_datetime(train["date"])
+features = [c for c in train.columns if c not in ["date", "churn"]]
+
+val_blocks = [
+    ["2020-07","2020-08","2020-09"],
+    ["2020-10","2020-11","2020-12"]
+]
+
+for months in val_blocks:
+    mask = train["date"].dt.to_period("M").isin([pd.Period(m, "M") for m in months])
+    X_train, y_train = train.loc[~mask, features], train.loc[~mask, "churn"]
+    X_val, y_val     = train.loc[mask,  features], train.loc[mask,  "churn"]
+
+    model = CatBoostClassifier(verbose=0, random_seed=42)
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict_proba(X_val)[:, 1]
+
+    # --- En iyi threshold'u F1'e göre seç ---
+    precision, recall, thresholds = precision_recall_curve(y_val, y_pred)
+    f1_scores = 2 * (precision * recall) / (precision + recall + 1e-9)
+    best_idx = f1_scores.argmax()
+    best_threshold = thresholds[best_idx]
+
+    auc = roc_auc_score(y_val, y_pred)
+    f1  = f1_score(y_val, (y_pred >= best_threshold).astype(int))
+
+    print(f"VAL {months} | AUC={auc:.4f} | F1={f1:.4f} | best_thr={best_threshold:.3f}")
+
+
+
+import pandas as pd
+from typing import Sequence
+from catboost import CatBoostClassifier
+
+def apply_threshold_to_test(
+    model: CatBoostClassifier,
+    test: pd.DataFrame,
+    features: Sequence[str],
+    id_col: str = "cust_id",
+    threshold: float = 0.5,
+    out_csv: str | None = None,
+) -> pd.DataFrame:
+    """
+    test: test DataFrame'i (id_col bulunmalı)
+    features: model eğitiminde kullandığın aynı feature listesi
+    threshold: val'de seçtiğin en iyi eşik (ör. best_threshold)
+    out_csv: "preds.csv" verirsen sonuç CSV'ye yazılır
+    """
+    assert id_col in test.columns, f"{id_col} test'te yok!"
+    X_test = test[features]
+
+    # Olasılık ve ikili çıktı
+    y_score = model.predict_proba(X_test)[:, 1]
+    y_bin   = (y_score >= threshold).astype(int)
+
+    pred_df = pd.DataFrame({
+        id_col: test[id_col].values,
+        "y_pred_prob": y_score,
+        "y_pred": y_bin
+    })
+
+    if out_csv:
+        pred_df.to_csv(out_csv, index=False)
+
+    return pred_df
+
+
+# Diyelim ki bunlar elinde hazır:
+# model           -> val'de eğittiğin CatBoost modeli
+# best_threshold  -> val'den seçtiğin eşik (ör. 0.37)
+# features        -> eğitimde kullandığın kolonlar listesi
+# test            -> test DataFrame'in (cust_id kolonu var)
+
+pred_df = apply_threshold_to_test(
+    model=model,
+    test=test,
+    features=features,
+    id_col="cust_id",
+    threshold=best_threshold,
+    out_csv="test_preds.csv"   # kaydetmek istemezsen None bırak
+)
+
+print(pred_df.head())
+# Kolonlar: ["cust_id", "y_pred_prob", "y_pred"]
+
+
+
+
+
+
+
+
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score, f1_score, precision_recall_curve
