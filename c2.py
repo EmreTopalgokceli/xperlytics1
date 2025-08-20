@@ -1,3 +1,27 @@
+import pandas as pd
+
+def add_outlier_flags(df, cols, lower_q=0.01, upper_q=0.99):
+    """
+    Belirtilen kolonlarda outlier flag üretir.
+    lower_q ve upper_q quantile eşikleri (örn. 0.01 = alt %1)
+    """
+    for col in cols:
+        low, high = df[col].quantile([lower_q, upper_q])
+        df[f"{col}_outlier_flag"] = ((df[col] < low) | (df[col] > high)).astype(int)
+    return df
+
+# Örnek kullanım
+df = pd.DataFrame({
+    "cc_transaction_all_cnt": [1,5,6,100,3,2,120,4,6,7],
+    "mobile_eft_all_amt": [10,20,15,999,12,14,1050,13,17,16]
+})
+
+df = add_outlier_flags(df, ["cc_transaction_all_cnt", "mobile_eft_all_amt"])
+print(df)
+
+
+
+
 # val_blocks içinde stringler olsun
 val_blocks = [
     ["2020-07", "2020-08", "2020-09"],
