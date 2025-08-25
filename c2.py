@@ -1,3 +1,40 @@
+def compute_stats(col_data, masks):
+    stats = {}
+    # mevcut değişkenler
+    stats['last_1m'] = col_data[masks['last_1m']].sum()
+    stats['mean_3m'] = col_data[masks['last_3m']].mean()
+    stats['mean_6m'] = col_data[masks['last_6m']].mean()
+    stats['mean_12m'] = col_data[masks['last_12m']].mean()
+
+    # ratio last_1m / mean_6m
+    stats['ratio_1m_6m'] = (
+        stats['last_1m'] / stats['mean_6m']
+        if stats['mean_6m'] and not pd.isna(stats['mean_6m']) else 0
+    )
+
+    # ratio last_1m / mean_12m
+    stats['ratio_1m_12m'] = (
+        stats['last_1m'] / stats['mean_12m']
+        if stats['mean_12m'] and not pd.isna(stats['mean_12m']) else 0
+    )
+
+    # normalized drop: (last_1m - mean_12m) / mean_12m
+    stats['drop_norm_12m'] = (
+        (stats['last_1m'] - stats['mean_12m']) / stats['mean_12m']
+        if stats['mean_12m'] and not pd.isna(stats['mean_12m']) else 0
+    )
+
+    # normalized drop: (last_1m - mean_6m) / mean_6m
+    stats['drop_norm_6m'] = (
+        (stats['last_1m'] - stats['mean_6m']) / stats['mean_6m']
+        if stats['mean_6m'] and not pd.isna(stats['mean_6m']) else 0
+    )
+
+    return stats
+
+
+
+
 import pandas as pd
 
 def add_outlier_flags(df, cols, lower_q=0.01, upper_q=0.99):
