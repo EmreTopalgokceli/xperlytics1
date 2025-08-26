@@ -1,3 +1,92 @@
+import numpy as np
+import pandas as pd
+
+# ---------- config ----------
+ID_COL   = "cust_id"
+DATE_COL = "date"
+VALUE_COLS = ["mobile_eft_all_cnt", "active_product_category_nbr",
+              "mobile_eft_all_amt", "cc_transaction_all_amt", "cc_transaction_all_cnt"]
+WINDOW = 6           # kaç aylık trend
+MIN_PERIODS = 3      # en az kaç gözlemle eğim hesaplansın
+FREQ = "MS"          # Month Start (aylık)
+FILL_MISSING = 0     # eksik aylar için dolgu (count türleri için 0 mantıklı)
+# ----------------------------
+
+def _rolling_slope_1d(y: np.ndarray, window: int, min_periods: int) -> np.ndarray:
+    """Tek boyutlu seri üzerinde kayan pencere ile lineer eğim (numpy.polyfit) döndürür."""
+    n = len(y)
+    out = np.full(n, np.nan, dtype=float)
+    for i in range(n):
+        s = max(0, i - window + 1)
+        y_win = y[s:i+1]
+        valid = ~np.isnan(y_win)
+        if valid.sum() >= min_periods:
+            # x: 0..len-1, y: pencere değerleri
+            x = np.arange(valid.sum(), dtype=float)
+            coef = np.polyfit(x, y_win[valid].astype(float), 1)
+            out[i] = coef[0]  # slope
+    return out
+
+def add_trend_slopes(df: pd.DataFrame,
+                     id_col: str,
+                     date_col: str,
+                     value_cols: list[str],
+                     window: int = 6,
+                     min_periods: int = 3,
+                     freq: str = "MS",
+                     fill_missing = 0) -> pd.DataFrame:
+    """Her müşteri × tarih için son `window` ayın eğimini hesaplar ve kolonlara ekler."""
+    d = df.copy()
+    d[date_col] = pd.to_datetime(d[date_col])
+    d = d.sort_values([id_col, date_col])
+
+    res = []
+    for cid, g in d.groupby(id_col, as_index=False):
+        # ay bazına indir, eksikleri doldur
+        g = (g.set_index(date_col)
+               .resample(freq)
+               .sum()[value_cols]        # aynı ayda birden çok kayıt varsa topla
+               .astype(float))
+        if fill_missing is not None:
+            g = g.fillna(fill_missing)
+
+        # her value_col için kayan pencere eğimi
+        for col in value_cols:
+            g[f"{col}_slope_w{window}"] = _rolling_slope_1d(
+                g[col].values, window=window, min_periods=min_periods
+            )
+
+            # (Opsiyonel) seviyeye göre normalize eğim: eğim / rolling mean
+            g[f"{col}_slope_norm_w{window}"] = (
+                g[f"{col}_slope_w{window}"] /
+                g[col].rolling(window, min_periods=min_periods).mean().replace(0, np.nan)
+            )
+
+        g[id_col] = cid
+        g = g.reset_index().rename(columns={date_col: date_col})
+        res.append(g[[id_col, date_col] + [c for c in g.columns if c.endswith(f"w{window}")]])
+
+    slopes = pd.concat(res, ignore_index=True)
+
+    # Orijinal veriyle tarih bazında birleştir (yalnızca slope'lar gelecek)
+    out = (df.merge(slopes, on=[ID_COL, DATE_COL], how="left")
+             .sort_values([ID_COL, DATE_COL]))
+    return out
+
+# ---- kullanım ----
+# df: elindeki uzun tablo (cust_id, date, ve VALUE_COLS mevcut olmalı)
+df_with_slopes = add_trend_slopes(
+    df, id_col=ID_COL, date_col=DATE_COL, value_cols=VALUE_COLS,
+    window=WINDOW, min_periods=MIN_PERIODS, freq=FREQ, fill_missing=FILL_MISSING
+)
+
+# Eğer sadece her müşteri için SON tarihteki snapshot'ı istiyorsan:
+last_slopes = (df_with_slopes.sort_values([ID_COL, DATE_COL])
+                             .groupby(ID_COL).tail(1)
+                             .reset_index(drop=True))
+
+
+
 def compute_stats(col_data, masks):
     stats = {}
     # mevcut değişkenler
