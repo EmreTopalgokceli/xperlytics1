@@ -1,3 +1,49 @@
+import numpy as np, pandas as pd
+
+# Varsayımlar:
+# - df uzun formatta ve aylık gridde
+# - df['cust_id'], df['date'] (datetime), ve bir metrik kolonu var (ör: 'cc_transaction_all_cnt')
+# Tek metrik üzerinden gidelim; istersen bunu bir liste için döngüye alabilirsin.
+METRIC = 'cc_transaction_all_cnt'
+WINDOW = 12
+MINP   = 3
+
+df = df.sort_values(['cust_id','date'])
+
+# 1) Her müşteri × her tarih için rolling slope (son WINDOW ay)
+slopes = (
+    df.groupby('cust_id')[METRIC]
+      .rolling(WINDOW, min_periods=MINP)
+      .apply(lambda y: np.polyfit(np.arange(len(y)), y, 1)[0], raw=False)
+      .reset_index(level=0, drop=True)
+)
+df[f'{METRIC}_slope_w{WINDOW}'] = slopes
+
+# 2) Müşteri bazında tekilleştir (son satır = son ay)
+last_idx = df.groupby('cust_id')['date'].idxmax()
+last_rows = df.loc[last_idx, ['cust_id', f'{METRIC}_slope_w{WINDOW}']].rename(
+    columns={f'{METRIC}_slope_w{WINDOW}': 'last_slope'}
+)
+
+# 3) Müşteri bazında max slope ve slope varyansı
+agg = (df.groupby('cust_id')[f'{METRIC}_slope_w{WINDOW}']
+         .agg(max_slope='max', slope_var='var')
+         .reset_index())
+
+# 4) Birleştir ve gap/ratio üret
+feat = last_rows.merge(agg, on='cust_id', how='left')
+feat['gap_max_minus_last'] = feat['max_slope'] - feat['last_slope']
+feat['last_over_max'] = np.where(feat['max_slope'].abs() > 0,
+                                 feat['last_slope'] / feat['max_slope'],
+                                 np.nan)
+
+# Sonuç: müşteri bazında tek satır feature tablosu
+# feat.columns -> ['cust_id','last_slope','max_slope','slope_var','gap_max_minus_last','last_over_max']
+print(feat.head())
+
+
+
+
 import numpy as np
 import pandas as pd
 
