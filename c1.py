@@ -1,5 +1,89 @@
 import numpy as np
 import pandas as pd
+
+# ---- helpers ----
+def slope_np(y):
+    y = np.asarray(y, dtype=float)
+    if len(y) < 2:
+        return np.nan
+    x = np.arange(len(y), dtype=float)
+    # y = a*x + b, a = slope
+    try:
+        a, b = np.polyfit(x, y, 1)
+        return a
+    except Exception:
+        return np.nan
+
+def feats_from_last12(vals):
+    v = pd.Series(vals, dtype=float).fillna(0.0)
+    n = len(v)
+    if n == 0:
+        return {
+            "last_vs_12m_ratio": np.nan, "last_vs_6m_ratio": np.nan,
+            "recent3_vs_prev9": np.nan, "slope_3m": np.nan,
+            "slope_6m": np.nan, "slope_12m": np.nan,
+            "max_minus_last": np.nan, "zero_months": 0,
+            "below_6m_count": 0, "last_zscore_12m": 0.0
+        }
+    last = v.iloc[-1]
+    m12 = v.mean()
+    m6 = v.iloc[-6:].mean() if n >= 6 else v.mean()
+    prev9 = v.iloc[:-3].mean() if n >= 4 else v.mean()
+    recent3 = v.iloc[-3:].mean() if n >= 3 else v.mean()
+    std12 = v.std(ddof=0)
+
+    return {
+        "last_vs_12m_ratio": (last / m12) if m12 != 0 else 0.0,
+        "last_vs_6m_ratio": (last / m6) if m6 != 0 else 0.0,
+        "recent3_vs_prev9": recent3 - prev9,
+        "slope_3m": slope_np(v.iloc[-3:]) if n >= 3 else np.nan,
+        "slope_6m": slope_np(v.iloc[-6:]) if n >= 6 else slope_np(v),
+        "slope_12m": slope_np(v),
+        "max_minus_last": v.max() - last,
+        "zero_months": int((v == 0).sum()),
+        "below_6m_count": int((v < m6).sum()),
+        "last_zscore_12m": ((last - m12) / std12) if std12 > 0 else 0.0,
+    }
+
+# ---- main pipeline ----
+# ch: columns = ['cust_id','date','mobile_eft_all_cnt','active_product_category_nbr',
+#                'mobile_eft_all_amt','cc_transaction_all_amt','cc_transaction_all_cnt']
+
+ch["date"] = pd.to_datetime(ch["date"])
+ch = ch.sort_values(["cust_id","date"])
+
+# her müşteri için son 12 satır
+last12 = ch.groupby("cust_id").tail(12)
+
+target_cols = [
+    "mobile_eft_all_cnt",
+    "mobile_eft_all_amt",
+    "cc_transaction_all_amt",
+    "cc_transaction_all_cnt",
+]
+
+out = []
+for col in target_cols:
+    f = (
+        last12.groupby("cust_id")[col]
+        .apply(lambda s: pd.Series(feats_from_last12(s.values)))
+        .add_prefix(col + "__")
+        .reset_index()
+    )
+    out.append(f)
+
+# özellikleri birleştir
+from functools import reduce
+feats = reduce(lambda left, right: pd.merge(left, right, on="cust_id", how="outer"), out)
+
+print(feats.head())
+
+
+
+
+
+import numpy as np
+import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 # Örnek: veri yüklenmiş durumda -> ch
