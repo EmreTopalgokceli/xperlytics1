@@ -1,3 +1,37 @@
+# 1. Ay bazlı quantile
+ch["active_cat_quantile"] = ch.groupby("date")["active_product_category_nbr"]\
+                              .transform(lambda x: pd.qcut(x, q=4, labels=False, duplicates="drop"))
+
+# 2. Her müşteri için son 12 ay
+last12 = ch.sort_values(["cust_id","date"]).groupby("cust_id").tail(12)
+
+# 3. Feature türetme
+def quantile_feats(qs):
+    qs = qs.dropna().astype(int)
+    if len(qs)==0:
+        return pd.Series({
+            "quantile_mode": np.nan,
+            "quantile_last": np.nan,
+            "quantile_trend": 0,
+            "quantile_drop_count": 0
+        })
+    mode = qs.mode().iloc[0]
+    last = qs.iloc[-1]
+    trend = last - qs.iloc[0]          # pozitif = artış, negatif = düşüş
+    drop_count = (qs.diff().fillna(0) < 0).sum()
+    return pd.Series({
+        "quantile_mode": mode,
+        "quantile_last": last,
+        "quantile_trend": trend,
+        "quantile_drop_count": drop_count
+    })
+
+quantile_feats_df = last12.groupby("cust_id")["active_cat_quantile"].apply(quantile_feats).reset_index()
+
+print(quantile_feats_df.head())
+
+
+
 import numpy as np, pandas as pd
 
 # --- helpers ---
