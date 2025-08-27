@@ -1,3 +1,32 @@
+from sklearn.metrics import f1_score
+from sklearn.base import clone
+
+# Manuel threshold'lu evaluate fonksiyonu
+def evaluate(model, X, y, threshold=0.3):   # burada threshold'u sabitledim
+    """Modelin F1 skorunu hesapla (binary classification)."""
+    proba = model.predict_proba(X)[:, 1]
+    preds = (proba >= threshold).astype(int)
+    return f1_score(y, preds)
+
+# Base F1
+base_f1 = evaluate(model, X_val, y_val, threshold=0.3)
+
+rows = []
+for col in X_train.columns:
+    Xtr = X_train.drop(columns=[col])
+    Xva = X_val.drop(columns=[col])
+    m = clone(model)              # fresh copy
+    m.fit(Xtr, y_train)
+    f1 = evaluate(m, Xva, y_val, threshold=0.3)
+    rows.append((col, f1 - base_f1))
+
+# Sonuçları sırala
+rows.sort(key=lambda x: x[1], reverse=True)
+for col, delta in rows[:20]:
+    print(f"{col:40s} ΔF1={delta:.4f}")
+
+
+
 import numpy as np, pandas as pd
 
 # Varsayımlar:
