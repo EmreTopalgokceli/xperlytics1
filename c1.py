@@ -1,3 +1,42 @@
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+
+# Örnek: veri yüklenmiş durumda -> ch
+# cust_id, date, mobile_eft_all_cnt, active_product_category_nbr, ...
+
+# Önce tarih tipini dönüştürelim
+ch["date"] = pd.to_datetime(ch["date"])
+
+# Her müşteri için son 12 ayı seçelim
+ch = ch.sort_values(["cust_id", "date"])
+last12 = ch.groupby("cust_id").tail(12)   # her müşterinin son 12 ayı
+
+def compute_slope(x):
+    if len(x) < 2:
+        return np.nan
+    X = np.arange(len(x)).reshape(-1, 1)
+    y = x.values
+    model = LinearRegression().fit(X, y)
+    return model.coef_[0]
+
+# Örnek: EFT adedi için slope
+slope_df = (
+    last12.groupby("cust_id")["mobile_eft_all_cnt"]
+    .apply(compute_slope)
+    .reset_index(name="eft_cnt_slope")
+)
+
+# Aynı şekilde diğer değişkenler için de slope hesaplanabilir:
+for col in ["mobile_eft_all_amt", "cc_transaction_all_amt", "cc_transaction_all_cnt"]:
+    slope_df[col.replace("_all_", "_") + "_slope"] = (
+        last12.groupby("cust_id")[col].apply(compute_slope).values
+    )
+
+print(slope_df.head())
+
+
+
 def null_churn_report(df, groups, target="churn", id_col="cust_id", date_col="date"):
     report = {}
 
