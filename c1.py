@@ -1,3 +1,23 @@
+from sklearn.base import clone  # <-- doğru import
+
+base_f1 = evaluate(model, X_val, y_val)
+
+rows = []
+for col in X_train.columns:
+    Xtr = X_train.drop(columns=[col])
+    Xva = X_val.drop(columns=[col])
+    m = clone(model)            # eski state’i taşımamak için fresh kopya
+    m.fit(Xtr, y_train)
+    f1 = evaluate(m, Xva, y_val)
+    rows.append((col, f1 - base_f1))
+
+# zarar verenleri görmek için:
+rows.sort(key=lambda x: x[1], reverse=True)  # pozitif fark = çıkarınca F1 artmış (zararlı)
+for col, delta in rows[:20]:
+    print(f"{col:40s} ΔF1={delta:.4f}")
+
+
+
 # 1. Ay bazlı quantile
 ch["active_cat_quantile"] = ch.groupby("date")["active_product_category_nbr"]\
                               .transform(lambda x: pd.qcut(x, q=4, labels=False, duplicates="drop"))
