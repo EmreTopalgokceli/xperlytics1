@@ -1,6 +1,74 @@
 import numpy as np
 import pandas as pd
 
+# --- helpers ---
+def slope_np(y):
+    y = np.asarray(y, dtype=float)
+    if len(y) < 2: return np.nan
+    x = np.arange(len(y), dtype=float)
+    a, b = np.polyfit(x, y, 1)
+    return a
+
+def feats_from_last12(vals):
+    v = pd.Series(vals, dtype=float).fillna(0.0)
+    n  = len(v)
+    last = v.iloc[-1] if n else 0.0
+    m12  = v.mean() if n else 0.0
+    m6   = v.iloc[-6:].mean() if n >= 6 else m12
+    prev9 = v.iloc[:-3].mean() if n >= 4 else m12
+    recent3 = v.iloc[-3:].mean() if n >= 3 else m12
+    std12 = v.std(ddof=0)
+
+    return pd.Series({
+        "last_vs_12m_ratio": (last / m12) if m12 != 0 else 0.0,
+        "last_vs_6m_ratio":  (last / m6)  if m6  != 0 else 0.0,
+        "recent3_vs_prev9":  recent3 - prev9,
+        "slope_3m":  slope_np(v.iloc[-3:]) if n >= 3 else np.nan,
+        "slope_6m":  slope_np(v.iloc[-6:]) if n >= 6 else slope_np(v),
+        "slope_12m": slope_np(v),
+        "max_minus_last": v.max() - last,
+        "zero_months": int((v == 0).sum()),
+        "below_6m_count": int((v < m6).sum()),
+        "last_zscore_12m": ((last - m12) / std12) if std12 > 0 else 0.0,
+    })
+
+# --- pipeline ---
+ch["date"] = pd.to_datetime(ch["date"])
+ch = ch.sort_values(["cust_id", "date"])
+last12 = ch.groupby("cust_id").tail(12)
+
+target_cols = [
+    "mobile_eft_all_cnt",
+    "mobile_eft_all_amt",
+    "cc_transaction_all_amt",
+    "cc_transaction_all_cnt",
+]
+
+dfs = []
+for col in target_cols:
+    # -> DataFrame: index=cust_id, columns=feature keys
+    tmp = last12.groupby("cust_id")[col].apply(feats_from_last12)
+    # benzersiz kolon adları
+    tmp.columns = [f"{col}__{k}" for k in tmp.columns]
+    dfs.append(tmp)
+
+# yan yana birleştir (RAM dostu) ve cust_id'yi sütuna çevir
+feats = pd.concat(dfs, axis=1).reset_index()
+
+# kontrol
+# print(feats.shape)
+# print(feats.columns[:10])
+# print(feats.head(3))
+
+# ana veriye eklemek (ör. rtr)
+# rtr = rtr.merge(feats, on="cust_id", how="left")
+
+
+
+
+import numpy as np
+import pandas as pd
+
 # ---- helpers ----
 def slope_np(y):
     y = np.asarray(y, dtype=float)
