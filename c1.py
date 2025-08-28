@@ -1,3 +1,40 @@
+import os
+import pandas as pd
+
+folder = "submission_comp/probas"
+dfs = {}
+
+# klasördeki tüm csv dosyalarını oku
+for file in os.listdir(folder):
+    if file.endswith(".csv"):
+        # örn: proba_ET.csv -> ET
+        name = os.path.splitext(file)[0].split("_")[-1].upper()
+        path = os.path.join(folder, file)
+        df = pd.read_csv(path)
+        # son sütunu al
+        last_col = df.iloc[:, -1]
+        dfs[name] = last_col.reset_index(drop=True)
+
+# Hepsini tek bir DataFrame’e koy
+all_probs = pd.concat(dfs, axis=1)
+
+# Özet istatistikleri gör
+print(all_probs.describe().T)
+
+# İstersen histogram çizelim
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(12,6))
+for name in all_probs.columns:
+    plt.hist(all_probs[name], bins=50, alpha=0.4, label=name)
+plt.title("Model Tahmin Olasılık Dağılımları")
+plt.xlabel("Probability")
+plt.ylabel("Frekans")
+plt.legend()
+plt.show()
+
+
+
 from sklearn.metrics import f1_score
 
 def evaluate(model, X, y, threshold=0.5):
