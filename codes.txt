@@ -1,0 +1,501 @@
+# paketi manuel yüklemek için
+# pip install -e .
+
+#########################
+
+# Bir cik yıl, her optionu dene
+# Birden fazla cik year, try each option
+# give file ,try each option
+
+# Each option, different forms. tek tek dene
+# last, first, all
+# window hem report hem filed
+# group
+
+
+######################
+Arguments
+--cik A list of CIKs (e.g., 7388 320193) or all. Must be used with --ref-years
+--sic Optional	None	A list of SIC codes (e.g., 4911 1311). Must be used with --ref-years.
+
+
+
+edgar-fetcher get-filings \
+  --path "/Users/emre/Downloads/Relocations08062025.xlsx" \
+  --id-col "cik" \
+  --year-col "EffectiveYear" \
+  --forms all \
+  --window 5 \
+  --group core \
+  --basis report \
+  --out "/Volumes/Extreme SSD/edgar_new_full/master_index.csv" \
+  --download "/Volumes/Extreme SSD/edgar_new_full" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu" \
+  --workers 6
+
+############ tek cik tek yıl all forms filed date. (eğer download optionunu kullanmazsan filings'leri indirmez yalnız master_index dosyasını oluşturur.
+
+edgar-fetcher get_filings \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher get-filings \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_iindex.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+!! downloaded için log oluşmadı.
+
+edgar-fetcher get_filings \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms q \
+  --groups core \
+  --q-selection first \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+##########################
+# Alttaki harika çalışıyor
+edgar-fetcher get_filings \
+  --cik 320193 3990 3116 3197 3673 78890 81381 84748 \
+  --ref-years 2010 \
+  --forms q \
+  --groups core \
+  --q-selection first \
+  --window 7
+  --basis report \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+##########################
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2011 \
+  --forms q \
+  --groups core \
+  --q-selection first \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2011 \
+  --forms q \
+  --groups core \
+  --q-selection first \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+############ yukarıdakine  window ekliyoruz. ve bu kez report date'e göre eğer report date ise report date -+5 yıl oluyor. mesela her cik için k,ks,q formları 2005-2006-07-08-09-10-11-12-13-14-15 için report date'e göre bütün formları getlirir.
+
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --download "/Users/emre/Documents/PYprojects" \
+  --groups core \
+  --basis filed \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+##### eğer header ve address'i de eklemek istersek group'a ekliyoruz.
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --download "/Users/emre/Documents/PYprojects" \
+  --groups core,enriched,address \
+  --basis filed \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+#### Bunu bir zaman aralığında mesela 2000-2005 ve birden fazla cik'e göre yapmak istersek, cik'leri virgülle yan yana yazıp, tarihi ise aşağıdaki gibi 2000-2002
+şu formatta yazmak gerekecektir.
+
+edgar-fetcher build-master \
+  --cik 1005286,320193 \
+  --ref-years 2010-2014 \
+  --forms all \
+  --download "/Users/emre/Documents/PYprojects" \
+  --groups core,enriched,address \
+  --basis filed \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+##### Aşağıdaki ise yukarıdaki kodu, tüm cik'ler için report date esas alarak çalıştırır
+
+edgar-fetcher build-master \
+  --cik all \
+  --ref-years 2010-2014 \
+  --forms all \
+  --download "/Users/emre/Documents/PYprojects" \
+  --groups core,enriched,address \
+  --basis filed \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+############ birden fazla cik birden fazla yıl yalnızca k, ks ve q formlar, q'nun yalnızca her yılın son q'su ve report date'e gore
+
+# cik yoksa?
+
+edgar-fetcher build-master \
+  --cik 1005286,320193 \
+  --ref-years 2010,2020 \
+  --forms k,ks,q \
+  --q-selection last \
+  --groups "core" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+############ yukarıdakine yaşnızca window ekliyoruz. Bu durumda basis eğer report date ise report date -+5 yıl oluyor. mesela her cik için k,ks,q formları 2005-2006-
+
+edgar-fetcher build-master \
+  --cik 1005286,320193 \
+  --ref-years 2010,2020 \
+  --forms k,ks,q \
+  --window 5 \
+  --q-selection last \
+  --groups "core" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+##########################
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010,2015 \
+  --forms q \
+  --window 5 \
+  --q-selection last \
+  --groups "core" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010,2015 \
+  --forms q \
+  --window 5 \
+  --q-selection last \
+  --groups "core" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index03.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+
+
+
+
+edgar-fetcher build-master \
+  --cik 320193 \
+  --ref-years 2010,2015 \
+  --forms ks \
+  --q-selection all \
+  --groups "core,enriched,address" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --cik 320193 \
+  --ref-years 2010,2015 \
+  --forms ks \
+  --q-selection all \
+  --groups "core,enriched,address" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index00.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+# --fetch-index ilk çalıştırdığında all, sonrakilerde only missing'ler
+
+edgar-fetcher build-master \
+  --cik 320193 \
+  --ref-years 2013,2014 \
+  --forms all \
+  --groups "core" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index01.csv \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --path "/Users/emre/Downloads/Relocations08062025.xlsx" \
+  --id-col "cik" \
+  --year-col "EffectiveYear" \
+  --forms ks \
+  --basis report \
+  --out master_index_v5.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --path "/Users/emre/Downloads/Relocations08062025 (1).xlsx" \
+  --id-col "cik" \
+  --year-col "EffectiveYear" \
+  --forms ks \
+  --basis report \
+  --window 5 \
+  --out master_index_v6.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+  --debug true
+
+# Hata olursa download_failures_YYYYMMDD_HHMMSS.csv ve header_fetch_failures_YYYYMMDD_HHMMSS.csv dosyaları oluşuyor output ile birlikte.
+
+edgar-fetcher build-master \
+  --path "/Users/emre/Downloads/Relocations08062025.xlsx (2)" \
+  --id-col "cik" \
+  --year-col "EffectiveYear" \
+  --forms k \
+  --window 5 \
+  --basis report \
+  --out master_index_v3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2020,2023 \
+  --forms k \
+  --window 5 \
+  --basis report \
+  --out master_index_v3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher clean-filings \
+  --input 1005286 \
+  --output \
+
+
+
+
+
+
+edgar-fetcher build-master \
+  --ref-years 2010,2015 \
+  --forms ks \
+  --q-selection all \
+  --groups "core,enriched,address" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --sic 3571
+  --ref-years 2010,2015 \
+  --forms ks \
+  --q-selection all \
+  --groups "core,enriched,address" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+
+edgar-fetcher build-master \
+  --cik 320193 \
+  --ref-years 2010 \
+  --forms "q" \
+  --q-selection all \
+  --groups "core,enriched,address" \
+  --download "/Users/emre/Documents/PYprojects" \
+  --basis report \
+  --out master_index3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+edgar-fetcher build-master \
+  --sic 3990
+  --ref-years 1993 \
+  --forms k \
+  --groups core \
+  --basis report \
+  --out master_index3.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+edgar-fetcher build-master \
+  --cik 320193 \
+  --ref-years 2010-2015 \
+  --forms k \
+  --groups "core,enriched,address,executives" \
+  --basis report \
+  --out master_with_execs.csv \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+
+
+edgar-fetcher build-master \
+  --cik 320193 3990 3116 3197 3673 78890 81381 84748 \
+  --ref-years 2010-2015 \
+  --forms all \
+  --out master_with_execs.csv \
+  --download "/Users/emre/Documents/PYprojects1" \
+  --index-root "/Volumes/Extreme SSD/edgar_full_index" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+78890
+81381
+84748
+
+python stage_one_parse.py "/Users/emre/Documents/PYprojects1" --o "/Users/emre/Documents/PYprojects2"
+python stage_one_cli.py --input "/path/in" --output "/path/out" --exception tables
+python stage_one_cli.py --input "/path/in" --output "/path/out" \
+  --exception tables, tags
+
+
+
+
+ python token_sayısı.py \
+  --root "/Volumes/Extreme SSD/edgar_clean" \
+  --questions questions.txt \
+  --avg-answer-toks 400 --sys-overhead 150 \
+  --save-xlsx out_costs1.xlsx
+
+
+
+
+
+
+edgar-fetcher query \
+  --prompt prompt.txt \
+  --questions questions.txt \
+  --input "/Volumes/Extreme SSD/sampled100_clean_test" \
+  --output out_answers.xlsx \
+  --model gpt-5-mini,gpt-5-nano,gpt-4.1-nano \
+  --each false \
+  --temperature 0.1
+
+
+
+python api_call.py \
+  --input "/Volumes/Extreme SSD/sampled100_clean" \
+  --output api_results.xlsx \
+  --prompt "/Users/emre/PycharmProjects/pypackages/edgar-fetcher/src/edgar_fetcher/prompt.txt" \
+  --questions "/Users/emre/PycharmProjects/pypackages/edgar-fetcher/src/edgar_fetcher/questions.txt" \
+  --model gpt-5-mini,gpt-5-nano,gpt-4.1-nano,gemini-1.5-pro,gemini-2.5-flash \
+  --temperature 0.0,0.0,0.0,0.0,0.0 \
+  --each true \
+  --max-concurrency 4 \
+  --timeout-sec 120
+
+
+gpt-5-mini,gpt-5-nano,gpt-4.1-nano

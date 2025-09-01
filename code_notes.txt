@@ -1,0 +1,161 @@
+Download speed form SEC is dynamic.
+
+create a venv. (suggested)
+activate
+cd your folder (e.g. cd my_edgar_research
+pip install edgar-fetcher
+
+
+
+"""
+usage argumants
+
+--cik, tek bir cik olabilir, virgülle birbirini takip eden birden fazla cik olabilir ya da all olabilir
+--cik 1005286|1005286 34000 3892|all
+
+--ref-years tek bir yıl, virgülle birbirini takip eden birden fazla yıl olabilir, bir aralık ya da all olabilir
+--ref-years 2010|1995 2005 2014|1993-2003|all (default:
+
+--basis ref-years'ın filing date mi report date mi göre çalışacağını belirler.
+--basis filed|report (default:filed)
+
+--window istenirse referans yılın -+ aralığı da alınabilir. --window 5 ise ref-year'ın -+5 yılı için istenilenn sonuçlar gelir.
+--window 5
+
+--form talep edilen formlar kendi ismiyle çağrılmalıdır. 10-K için yalnızca k, 10-K türevleri için ks, 10-Q için 1
+--form k q ks 8-k 4 all    (default:)
+
+--q_selection eğer formlardan q seçilmişse istenirse ilgili yıldaki ilk, son ya da tüm q'lar alınabilir
+--q_selection first|last|all (deefault:all)
+
+--groups hangi column'ların report'ta olması istendiğidir.
+--groups core,encriched,address (default:core)
+
+--out özet reportun çıktısını hangi isimle ve nereye kaydededeceiğimizi gösterir.
+--out "/Users/emre/Documents/PYprojects/master_index.csv"
+
+--dowload eğer filings'lerin kendisini de download etmek istiyorsak yazmamız gereken path'tir.
+--download "/Users/emre/Documents/PYprojects/"
+
+--log kodun çalışması sırasında bir hata gerçekleşirse --out ile aynı path'te oluşur. Default olarak hata oluşmazsa log kaydı da oluşmaz.
+fakat istenirse aşağıdaki şekilde yazılarak her durumda log kaydı oluşuturlabilir.
+--log all
+
+Aşağıdaki üç parametre SEC tarafından zorunlu belirlenmektedir.
+--name "Emre Topalgokceli" \
+--institution "Indiana University" \
+--email "etopa@iu.edu"
+
+"""
+
+Örnek:
+
+Açıkla
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+istenirse cik yerine sic  kod aynı mantıkla çalıştırılabilir
+
+edgar-fetcher build-master \
+  --sic 1040 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+ya da state of incorparation'a göre yapılabilir
+
+edgar-fetcher build-master \
+  --sic 1040 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+ya da tek tek komut satırında sıralamak yerine bir excel listesi vermek süretiyle de yapılabilir. aşağıda bir excel dosyası içindeki
+cik ve ref-years'a göre çalıştırılmıi bir komut bulunmaktadır. Yenilik olarak
+
+--path excel dosyasnının yolu. (xlsx ve csv formatını desteklemektedir.
+--id-col excel dosyasındaki cik kodlarının bulunduğu columun adı.
+--year-col excel dosyasındaki years kodlarının bulunduğu columun adı.
+
+edgar-fetcher build-master \
+  --path "/Users/emre/Downloads/Relocations08062025.xlsx" \
+  --id-col "cik" \
+  --year-col "EffectiveYear" \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+
+
+
+# column'ları describe et.
+# basis filed|report (default)
+
+# Aşağıdaki kod cik 1005286 için 2010 yılındaki tüm formların core colunms'ların
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+
+Örneğin eğer 1005286'nin 2010 yılındaki tüm formlarını dowload etmek ve bir output dosyası oluşturmak istersen (aşağıdaki örnekte ben onu master_index.csv olarak adlandırdım)
+bbu kodu çalıştırmak yeterli olacak. dosyaları download etmek istemiyorsa --download argümanını
+
+edgar-fetcher build-master \
+  --cik 1005286 \
+  --ref-years 2010 \
+  --forms all \
+  --groups core \
+  --download "/Users/emre/Documents/PYprojects/" \
+  --basis filed \
+  --out "/Users/emre/Documents/PYprojects/master_index.csv" \
+  --name "Emre Topalgokceli" \
+  --institution "Indiana University" \
+  --email "etopa@iu.edu"
+
+eğer birden fazla cik kullanmak istersen yukarıdaki kodda yalnızca
+  --cik 1005286,3400,16790
+
+eğer tüm cik'leri almak istersen
+  --cik all
+
+eğer birden fazla yıl
+
