@@ -1,3 +1,76 @@
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
+# === 0) Parametreler ===
+group_col = "primary_lang_filled"   # dil sütunu
+min_group_n = 20                    # çok küçük dil gruplarını at
+K = 3                               # doğrudan çalıştırmak için varsayılan küme sayısı
+
+# === 1) Özellik seçimi: _01 ve net_ sütunları ===
+dim01_cols = [c for c in df.columns if c.endswith("_01")]
+net_cols   = [c for c in df.columns if c.startswith("net_")]
+features   = dim01_cols + net_cols
+assert len(features) > 0, "Özellik sütunları bulunamadı (_01 / net_)"
+
+# === 2) Dil bazında ortalama profil matrisi ===
+valid_langs = df[group_col].value_counts()
+keep_langs  = valid_langs[valid_langs >= min_group_n].index
+lang_means  = df[df[group_col].isin(keep_langs)].groupby(group_col)[features].mean()
+
+# NaN varsa sütun bazında düşür (çok eksik olanları temizler)
+lang_means = lang_means.dropna(axis=1, how="any")
+use_features = lang_means.columns.tolist()
+
+# === 3) Ölçekleme ===
+scaler = StandardScaler()
+X = scaler.fit_transform(lang_means.values)   # shape: [n_langs, n_features]
+
+# === (Opsiyonel) K seçimi: silüet skoru ===
+sil = {}
+for k in range(2, min(8, len(lang_means))):   # 2..7 veya dil sayına göre
+    km = KMeans(n_clusters=k, random_state=42, n_init="auto")
+    labels = km.fit_predict(X)
+    sil[k] = silhouette_score(X, labels)
+print("Silhouette scores:", sil)
+
+# === 4) Nihai K-Means ===
+kmeans = KMeans(n_clusters=K, random_state=42, n_init="auto")
+labels = kmeans.fit_predict(X)
+
+lang_means["cluster"] = labels
+print("\nDil -> Küme ataması:")
+print(lang_means[["cluster"]].sort_values("cluster"))
+
+# === 5) Küme merkezlerini orijinal ölçeğe geri çevir (yorumlamak için) ===
+centers_z = kmeans.cluster_centers_                  # z-score uzayı
+centers   = scaler.inverse_transform(centers_z)      # orijinal (0-1 ve net) skala
+centers_df = pd.DataFrame(centers, columns=use_features)
+centers_df.insert(0, "cluster", range(K))
+print("\nKüme merkezleri (özellik ortalamaları):")
+print(centers_df.round(3))
+
+# === 6) (Opsiyonel) 2B PCA scatter (diller arası yakınlık) ===
+pca = PCA(n_components=2, random_state=42)
+XY = pca.fit_transform(X)
+
+plt.figure(figsize=(7,5))
+for c in range(K):
+    idx = (labels == c)
+    plt.scatter(XY[idx,0], XY[idx,1], label=f"cluster {c}")
+for i, name in enumerate(lang_means.index):
+    plt.text(XY[i,0], XY[i,1], str(name), fontsize=9)
+plt.xlabel("PC1"); plt.ylabel("PC2"); plt.title("Languages in cultural space (PCA)")
+plt.legend()
+plt.tight_layout()
+plt.show()
+
+
+
 import pandas as pd
 import numpy as np
 from scipy import stats
