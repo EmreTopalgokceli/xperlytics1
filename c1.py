@@ -1,3 +1,162 @@
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+# ===== Parametreler =====
+group_col = "primary_lang_filled"   # dil kolonu
+min_group_n = 20                    # çok küçük grupları dışla (gerektiğinde değiştir)
+alpha = 0.05
+
+# Hangi kolonlar test edilecek? (_01 ve net_ sütunları)
+dim01_cols = [c for c in df.columns if c.endswith("_01")]
+net_cols   = [c for c in df.columns if c.startswith("net_")]
+features   = dim01_cols + net_cols
+
+# Grupları filtrele (en az min_group_n gözlem)
+valid_langs = df[group_col].value_counts()
+keep_langs = valid_langs[valid_langs >= min_group_n].index
+df_test = df[df[group_col].isin(keep_langs)].copy()
+
+print("Dahil edilen diller ve örneklem büyüklükleri:")
+print(df_test[group_col].value_counts(), "\n")
+
+# ===== Yardımcı: etki büyüklükleri =====
+def eta_squared_anova(groups):
+    # toplam varyans
+    all_vals = np.concatenate(groups)
+    ss_total = np.nansum((all_vals - np.nanmean(all_vals))**2)
+
+    # grup içi ve gruplar arası
+    ss_between = 0.0
+    for g in groups:
+        ss_between += len(g) * (np.nanmean(g) - np.nanmean(all_vals))**2
+
+    # eta^2 = SS_between / SS_total
+    return float(ss_between / ss_total) if ss_total > 0 else np.nan
+
+def cohens_d(x, y):
+    x = x[~np.isnan(x)]
+    y = y[~np.isnan(y)]
+    nx, ny = len(x), len(y)
+    if nx < 2 or ny < 2:
+        return np.nan
+    # Welch d (pooled with unequal variances)
+    sx2, sy2 = np.var(x, ddof=1), np.var(y, ddof=1)
+    sp = np.sqrt(((nx-1)*sx2 + (ny-1)*sy2) / (nx+ny-2)) if (nx+ny-2) > 0 else np.nan
+    return (np.mean(x) - np.mean(y)) / sp if sp and sp > 0 else np.nan
+
+# ===== Testleri çalıştır =====
+rows = []
+for col in features:
+    if col not in df_test.columns:
+        continue
+
+    # grupları hazırla
+    groups = [df_test.loc[df_test[group_col] == g, col].astype(float).dropna().values
+              for g in keep_langs]
+
+    # boş/sayısal değilse geç
+    if sum(len(g) for g in groups) < 3:
+        continue
+
+    k = len(groups)
+
+    if k >= 3:
+        # Parametrik ANOVA
+        try:
+            f, p = stats.f_oneway(*groups)
+        except Exception:
+            f, p = np.nan, np.nan
+
+        # Non-parametrik Kruskal (sağlamlık için)
+        try:
+            h, p_kw = stats.kruskal(*groups)
+        except Exception:
+            h, p_kw = np.nan, np.nan
+
+        eta2 = eta_squared_anova(groups)
+
+        rows.append({
+            "feature": col,
+            "k_groups": k,
+            "test": "ANOVA",
+            "stat": f,
+            "p_value": p,
+            "robust_test": "Kruskal",
+            "robust_stat": h,
+            "robust_p": p_kw,
+            "effect_size": eta2
+        })
+
+    elif k == 2:
+        x, y = groups[0], groups[1]
+        # Welch t-test (equal_var=False)
+        t, p = stats.ttest_ind(x, y, equal_var=False)
+        d = cohens_d(x, y)
+        rows.append({
+            "feature": col,
+            "k_groups": k,
+            "test": "Welch t-test",
+            "stat": t,
+            "p_value": p,
+            "robust_test": None,
+            "robust_stat": None,
+            "robust_p": None,
+            "effect_size": d
+        })
+
+results = pd.DataFrame(rows).sort_values("p_value")
+print("İlk 10 sonuç:")
+print(results.head(10))
+
+# ===== Çoklu test düzeltmesi (Benjamini–Hochberg FDR) =====
+def fdr_bh(pvals, alpha=0.05):
+    p = np.array(pvals, dtype=float)
+    m = np.sum(~np.isnan(p))
+    order = np.argsort(p)
+    ranks = np.empty_like(order)
+    ranks[order] = np.arange(1, len(p)+1)
+    q = p * m / ranks
+    q_adj = np.minimum.accumulate(q[order][::-1])[::-1]
+    q_final = np.empty_like(q_adj)
+    q_final[order] = q_adj
+    return q_final
+
+results["q_value"] = fdr_bh(results["p_value"].values, alpha=alpha)
+sig = results[results["q_value"] <= alpha].copy()
+
+print("\nFDR (q≤{:.2f}) anlamlı bulunanlar:".format(alpha))
+print(sig[["feature","test","k_groups","stat","p_value","q_value","effect_size"]].head(20))
+
+# ===== Tukey HSD (opsiyonel, k≥3 ve anlamlılar için) =====
+try:
+    import statsmodels.api as sm
+    from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+    tukey_rows = []
+    for col in sig.loc[sig["test"]=="ANOVA", "feature"]:
+        sub = df_test[[group_col, col]].dropna()
+        if sub[group_col].nunique() < 3: 
+            continue
+        tuk = pairwise_tukeyhsd(sub[col].values, sub[group_col].values, alpha=alpha)
+        # statsmodels özeti text döndürür; tabloyu DataFrame'e çevirelim
+        tk = pd.DataFrame(data=tuk.summary().data[1:], columns=tuk.summary().data[0])
+        tk.insert(0, "feature", col)
+        tukey_rows.append(tk)
+
+    if tukey_rows:
+        tukey_df = pd.concat(tukey_rows, ignore_index=True)
+        print("\nTukey HSD özet (seçilmiş özellikler):")
+        print(tukey_df.head(20))
+    else:
+        tukey_df = None
+
+except Exception as e:
+    print("\n[Tukey HSD atlandı] statsmodels bulunamadı veya hata:", repr(e))
+    tukey_df = None
+
+
+
 import os
 import pandas as pd
 
