@@ -1,6 +1,52 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+import matplotlib.pyplot as plt
+
+# === 1) Özellik seti ===
+dim01_cols = [c for c in df.columns if c.endswith("_01")]
+net_cols   = [c for c in df.columns if c.startswith("net_")]
+features   = dim01_cols + net_cols
+
+# Dil gruplarının ortalama profilleri
+lang_means = df.groupby("primary_lang_filled")[features].mean().dropna(axis=1, how="any")
+
+# Ölçekleme (tüm boyutlar eşit ağırlıklı olsun diye)
+scaler = StandardScaler()
+X = scaler.fit_transform(lang_means.values)
+
+# === 2) Hiyerarşik kümeleme ===
+Z = linkage(X, method="ward", metric="euclidean")
+
+# Dendrogram
+plt.figure(figsize=(8,5))
+dendrogram(
+    Z,
+    labels=lang_means.index.tolist(),
+    leaf_rotation=45,
+    leaf_font_size=10
+)
+plt.title("Hierarchical clustering of languages")
+plt.tight_layout()
+plt.show()
+
+# === 3) Küme ataması ===
+K = 3  # istersen değiştirebilirsin
+labels = fcluster(Z, t=K, criterion="maxclust")
+
+# Sonuçları tabloya ekle
+lang_clusters = lang_means.copy()
+lang_clusters["cluster"] = labels
+
+print("Dillerin küme atamaları:\n")
+print(lang_clusters[["cluster"]].sort_values("cluster"))
+
+
+
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
