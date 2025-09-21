@@ -1,3 +1,147 @@
+# ============================
+# 0) Kurulum
+# ============================
+import numpy as np
+import pandas as pd
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score
+from sklearn.inspection import permutation_importance
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+
+# ============================
+# 1) Veri hazırlığı
+# ============================
+group_col = "primary_lang_filled"
+min_group_n = 20  # çok küçük sınıfları dışla
+
+# Özellik seti: normalize (…_01) + net_ sütunları
+dim01_cols = [c for c in df.columns if c.endswith("_01")]
+net_cols   = [c for c in df.columns if c.startswith("net_")]
+features   = dim01_cols + net_cols
+assert features, "Özellik sütunları (_01 ve/veya net_) bulunamadı."
+
+# Hedef ve filtre
+vc = df[group_col].value_counts()
+keep_langs = vc[vc >= min_group_n].index
+data = df[df[group_col].isin(keep_langs)].copy()
+
+X = data[features].astype(float)
+y = data[group_col].astype(str)
+
+# Eksik varsa basitçe düşelim (istersen impute edebilirsin)
+mask = X.notna().all(axis=1)
+X, y = X[mask], y[mask]
+
+# ============================
+# 2) Train / Test böl
+# ============================
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42, stratify=y
+)
+
+# ============================
+# 3) Modeller
+# ============================
+# 3a) LDA
+lda_pipe = Pipeline([
+    ("scaler", StandardScaler()),     # LDA için ölçekleme iyi olur
+    ("clf", LDA())
+])
+
+# 3b) Multinomial Logistic Regression
+logit_pipe = Pipeline([
+    ("scaler", StandardScaler(with_mean=True, with_std=True)),
+    ("clf", LogisticRegression(multi_class="multinomial", solver="lbfgs", max_iter=2000))
+])
+
+# 3c) Random Forest (ölçekleme gerekmez ama pipeline aynı kalsın)
+rf_pipe = Pipeline([
+    ("clf", RandomForestClassifier(
+        n_estimators=600,
+        max_depth=None,
+        random_state=42,
+        class_weight="balanced_subsample"
+    ))
+])
+
+models = {
+    "LDA": lda_pipe,
+    "Logit": logit_pipe,
+    "RF": rf_pipe
+}
+
+# ============================
+# 4) CV ile hızlı karşılaştırma
+# ============================
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+for name, pipe in models.items():
+    scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring="accuracy")
+    print(f"{name} | CV acc: {scores.mean():.3f} ± {scores.std():.3f}")
+
+# ============================
+# 5) Nihai model eğitimi (ör: en iyi çıkan)
+# ============================
+# İstersen sonuçlara bakıp başka modeli seç
+best_name = "LDA"   # örnek; CV çıktısına göre "Logit" veya "RF" seçebilirsin
+best_model = models[best_name]
+best_model.fit(X_train, y_train)
+
+y_pred = best_model.predict(X_test)
+print(f"\n== {best_name} Test Accuracy: {accuracy_score(y_test, y_pred):.3f}")
+print("\nClassification report:\n", classification_report(y_test, y_pred))
+print("\nConfusion matrix:\n", pd.DataFrame(confusion_matrix(y_test, y_pred),
+                                           index=best_model.classes_,
+                                           columns=best_model.classes_))
+
+# ============================
+# 6) Özellik katkısı / önem analizi
+# ============================
+# 6a) LDA/Logit için katsayılar
+if best_name in ["LDA", "Logit"]:
+    if best_name == "LDA":
+        # LDA: sınıf-özgül koef. (scaler sonrası uzayda)
+        # Çok sınıflı olduğunda koef boyutları (n_classes-1) diskriminant eksenlerine göre gelir
+        # Basit görünüm için mutlak değerin ortalamasını alıp sıralayalım
+        coef_mat = best_model.named_steps["clf"].scalings_  # (n_features x n_components)
+        imp = np.mean(np.abs(coef_mat), axis=1)
+    else:
+        coef_mat = best_model.named_steps["clf"].coef_      # (n_classes x n_features)
+        imp = np.mean(np.abs(coef_mat), axis=0)
+
+    feat_importance = pd.Series(imp, index=features).sort_values(ascending=False)
+    print("\nTop feature contributions (coef-based):")
+    print(feat_importance.head(15))
+
+# 6b) Modelden bağımsız Permutation Importance (daha güvenli)
+# (Not: RF için de, LDA/Logit için de çalışır)
+def permutation_importance_df(pipeline, X_val, y_val, n_repeats=20, random_state=42):
+    # Pipeline içindeki scaler varsa kalsın; PI pipeline üstünden yapılır.
+    r = permutation_importance(pipeline, X_val, y_val, n_repeats=n_repeats,
+                               random_state=random_state, n_jobs=-1, scoring="accuracy")
+    return pd.Series(r.importances_mean, index=features).sort_values(ascending=False)
+
+perm_imp = permutation_importance_df(best_model, X_test, y_test)
+print("\nPermutation importance (mean acc drop):")
+print(perm_imp.head(15))
+
+# ============================
+# 7) Hızlı yorumlama ipuçları
+# ============================
+# - Test accuracy anlamlı mı? (majority baseline ile kıyasla)
+# - Confusion matrix: Hangi diller birbirine karışıyor?
+# - Feature importance: Hangi kültür boyutları dili en çok ayırt ediyor?
+# - Eğer sınıf sayısı az ve örneklem dengesizse: class_weight kullan, stratified CV şart.
+
+
+
+
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
