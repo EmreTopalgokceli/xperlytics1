@@ -1,3 +1,56 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+
+# 1. Likert değişkenlerini seç
+likert_cols = [c for c in df.columns if c.endswith("_01")]
+X = df[likert_cols].copy()
+
+# 2. Standartlaştır
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# 3. Hiyerarşik clustering (Ward + Euclidean)
+Z = linkage(X_scaled, method='ward', metric='euclidean')
+
+# 4. Dendrogram (gözle inceleme için)
+plt.figure(figsize=(12, 6))
+dendrogram(Z, truncate_mode="lastp", p=30, show_leaf_counts=True)
+plt.title("Hierarchical Clustering Dendrogram (Ward, Likert items)")
+plt.xlabel("Cluster size or sample index")
+plt.ylabel("Distance")
+plt.show()
+
+# 5. Silhouette skoruna göre k seçimi
+sil_scores = {}
+for k in range(2, 11):  # 2'den 10 kümeye kadar test et
+    clusters = fcluster(Z, t=k, criterion="maxclust")
+    score = silhouette_score(X_scaled, clusters)
+    sil_scores[k] = score
+
+# Skorları görselleştir
+plt.figure()
+plt.plot(list(sil_scores.keys()), list(sil_scores.values()), marker="o")
+plt.title("Silhouette Scores for different k")
+plt.xlabel("Number of clusters (k)")
+plt.ylabel("Silhouette score")
+plt.show()
+
+# 6. En iyi k'yi seç
+best_k = max(sil_scores, key=sil_scores.get)
+print(f"Best k by silhouette score: {best_k}, score = {sil_scores[best_k]:.3f}")
+
+# 7. Seçilen k ile kümeleri ata
+clusters_final = fcluster(Z, t=best_k, criterion="maxclust")
+df["cluster_likert"] = clusters_final
+
+print(df["cluster_likert"].value_counts())
+
+
+
 # ============================
 # 0) Kurulum
 # ============================
