@@ -1,3 +1,16 @@
+# --- MINIMAL PATCH: geçmiş incident'ları her reference_date için yeniden ilişkilendir ---
+shell = df.select(customer_id, reference_date).dropDuplicates([customer_id, reference_date])
+
+df = (
+    shell.alias("s")
+    .join(df.alias("i"), on=customer_id, how="left")
+    .filter(F.col(f"i.{arrear_start_date}") < F.col(f"s.{reference_date}"))
+    .withColumn(reference_date, F.col(f"s.{reference_date}"))  # referans tarihini shell'den al
+)
+# --- PATCH SONU ---
+
+
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
