@@ -1,3 +1,23 @@
+Details on accuracy paradox:
+Zhu X, Davidson I (2007) Knowledge discovery and data mining: challenges and realities. Premier reference source. Information Science Reference. Cheapter 5’te anlatılıyor.
+https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0084217&type=printable
+https://www.mdpi.com/2227-7102/9/4/275
+
+
+Cite for accuracy formula
+https://link.springer.com/chapter/10.1007/978-3-031-35314-7_2
+
+
+More details on classification evaluation metrics:
+https://developers.google.com/machine-learning/crash-course/classification/accuracy-precision-recall#:~:text=The%20F1%20score%20is%20the,average)%20of%20precision%20and%20recall.&text=This%20metric%20balances%20the%20importance,accuracy%20for%20class%2Dimbalanced%20datasets.
+https://developers.google.com/machine-learning/crash-course/classification/thresholding#confusion_matrix
+
+
+
+
+
+
+
 Download speed form SEC is dynamic.
 
 create a venv. (suggested)
