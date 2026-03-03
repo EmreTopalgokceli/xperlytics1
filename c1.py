@@ -1,3 +1,116 @@
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def quadrant_mats_amount_weighted(
+    df: pd.DataFrame,
+    proba: pd.Series,
+    amount_col: str,
+    target_col: str = "target",
+    q: int = 10
+):
+    """
+    Top-right selection heatmaps (amount-weighted):
+      - bad_amount_recall: selected_bad_amount / total_bad_amount
+      - bad_amount_rate   : selected_bad_amount / selected_amount   (precision-like)
+      - amount_share      : selected_amount / total_amount
+    Axes are quantile ranks:
+      x_rank: debt quantile (1=low, q=high)
+      y_rank: risk quantile (1=low, q=high)
+    Cell (y_cut, x_cut) means selecting customers with (y_rank>=y_cut AND x_rank>=x_cut).
+    """
+    d = df.copy()
+
+    # --- ranks 1..q (duplicates='drop' may reduce actual number of bins)
+    d["y_rank"] = pd.qcut(pd.Series(proba), q=q, labels=False, duplicates="drop") + 1
+    d["x_rank"] = pd.qcut(d[amount_col].abs(), q=q, labels=False, duplicates="drop") + 1
+
+    # actual bin counts (if duplicates dropped)
+    y_max = int(d["y_rank"].max())
+    x_max = int(d["x_rank"].max())
+
+    # --- amounts
+    amt = d[amount_col].abs().astype(float)
+    bad = d[target_col].astype(int)
+
+    total_amount = float(amt.sum())
+    total_bad_amount = float((amt * bad).sum())
+
+    # guards
+    if total_amount == 0:
+        raise ValueError("Total amount is 0. Check amount_col.")
+    if total_bad_amount == 0:
+        raise ValueError("Total bad amount is 0. No positives in target?")
+
+    bad_amount_recall = np.zeros((y_max, x_max), dtype=float)
+    bad_amount_rate   = np.zeros((y_max, x_max), dtype=float)
+    amount_share      = np.zeros((y_max, x_max), dtype=float)
+    cell_n            = np.zeros((y_max, x_max), dtype=int)
+
+    # iterate over cutoffs (y_cut=1..y_max, x_cut=1..x_max)
+    for y_cut in range(1, y_max + 1):
+        for x_cut in range(1, x_max + 1):
+            sel = (d["y_rank"] >= y_cut) & (d["x_rank"] >= x_cut)
+
+            sel_amt = float(amt[sel].sum())
+            sel_bad_amt = float((amt[sel] * bad[sel]).sum())
+            n = int(sel.sum())
+
+            cell_n[y_cut-1, x_cut-1] = n
+            amount_share[y_cut-1, x_cut-1] = sel_amt / total_amount if total_amount > 0 else 0.0
+            bad_amount_recall[y_cut-1, x_cut-1] = sel_bad_amt / total_bad_amount if total_bad_amount > 0 else 0.0
+            bad_amount_rate[y_cut-1, x_cut-1] = sel_bad_amt / sel_amt if sel_amt > 0 else 0.0
+
+    # row/col labels: "y>=k", "x>=k" with highest on top, highest on right
+    y_labels = [f"risk ≥ {k}" for k in range(1, y_max + 1)]
+    x_labels = [f"debt ≥ {k}" for k in range(1, x_max + 1)]
+
+    # put high risk at top visually: reverse rows
+    def as_df(mat):
+        out = pd.DataFrame(mat, index=y_labels, columns=x_labels)
+        return out.iloc[::-1]
+
+    return as_df(bad_amount_recall), as_df(bad_amount_rate), as_df(amount_share), pd.DataFrame(cell_n, index=y_labels, columns=x_labels).iloc[::-1]
+
+
+def plot_heatmap(mat: pd.DataFrame, title: str, fmt: str = ".2f", annotate_n: pd.DataFrame | None = None):
+    plt.figure(figsize=(12, 6))
+    if annotate_n is None:
+        sns.heatmap(mat, annot=True, fmt=fmt, cmap="YlGnBu")
+    else:
+        # annotation as "value\n(n=...)"
+        ann = mat.copy().astype(object)
+        for i in range(mat.shape[0]):
+            for j in range(mat.shape[1]):
+                ann.iat[i, j] = f"{mat.iat[i, j]:{fmt}}\n(n={int(annotate_n.iat[i, j])})"
+        sns.heatmap(mat, annot=ann, fmt="", cmap="YlGnBu")
+    plt.title(title)
+    plt.xlabel("Outstanding debt quantile cutoff (higher = more debt)")
+    plt.ylabel("Model risk quantile cutoff (higher = more risk)")
+    plt.tight_layout()
+    plt.show()
+
+
+# ====== USAGE ======
+# amount_col: senin debt/amount kolonun (ör: 'f_cus_product_total_balance_amount')
+amount_col = "f_cus_product_total_balance_amount"
+
+recall_bad_amt, bad_rate, amt_share, n_mat = quadrant_mats_amount_weighted(
+    df=data_test_full,
+    proba=y_proba_oot,
+    amount_col=amount_col,
+    target_col="target",
+    q=10
+)
+
+plot_heatmap(recall_bad_amt, "Bad Amount Recall (Captured bad $ / Total bad $)", fmt=".2f", annotate_n=n_mat)
+plot_heatmap(bad_rate,       "Bad Amount Rate (Bad $ / Selected $)  [precision-like]", fmt=".2f", annotate_n=n_mat)
+plot_heatmap(amt_share,      "Portfolio Amount Share (Selected $ / Total $)", fmt=".2f", annotate_n=n_mat)
+
+
+
+
 # --- MINIMAL PATCH: geçmiş incident'ları her reference_date için yeniden ilişkilendir ---
 shell = df.select(customer_id, reference_date).dropDuplicates([customer_id, reference_date])
 
