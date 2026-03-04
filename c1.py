@@ -147,6 +147,17 @@ def generate_target_rate_heatmap(
 
 
 
+heatmap_data, pop_data, score_uni, out_uni = generate_target_rate_heatmap(
+    data_test_full,
+    y_proba_oot,
+    target_column="target",
+    balance_column="outstanding_debt",
+    cell=10,
+    data_train=data_train,
+    y_proba_train=y_proba_train
+)
+
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
