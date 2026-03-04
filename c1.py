@@ -1,3 +1,100 @@
+import numpy as np  # <<< ADDED >>>
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def generate_target_rate_heatmap(
+    data_test_full,
+    y_proba_oot,
+    target_column,
+    balance_column,
+    cell,
+    data_train,        # <<< ADDED >>>
+    y_proba_train      # <<< ADDED >>>
+):
+
+    # -------------------------
+    # Buckets learned on TRAIN
+    # -------------------------
+    score_edges = pd.Series(y_proba_train).quantile(np.linspace(0, 1, cell + 1)).to_numpy()  # <<< ADDED >>>
+    score_edges = np.unique(score_edges); score_edges[0] = -np.inf; score_edges[-1] = np.inf # <<< ADDED >>>
+
+    bal_edges = pd.Series(data_train[balance_column].abs()).quantile(np.linspace(0, 1, cell + 1)).to_numpy()  # <<< ADDED >>>
+    bal_edges = np.unique(bal_edges); bal_edges[0] = -np.inf; bal_edges[-1] = np.inf                         # <<< ADDED >>>
+
+    # -------------------------
+    # Apply TRAIN buckets to TEST
+    # -------------------------
+    data_test_full['y_bucket_id'] = pd.cut(
+        y_proba_oot,
+        bins=score_edges,
+        labels=False,
+        include_lowest=True
+    )  # <<< CHANGED >>>
+
+    data_test_full['x_bucket'] = pd.cut(
+        data_test_full[balance_column].abs(),
+        bins=bal_edges,
+        include_lowest=True
+    )  # <<< CHANGED >>>
+
+    # -------------------------
+    # y_bucket labels (bounds from TRAIN)
+    # -------------------------
+    y_bucket_id_train = pd.cut(
+        y_proba_train,
+        bins=score_edges,
+        labels=False,
+        include_lowest=True
+    )  # <<< ADDED >>>
+
+    proba_bounds = (
+        pd.DataFrame({'proba': y_proba_train})             # <<< CHANGED (was y_proba_oot) >>>
+        .groupby(y_bucket_id_train)['proba']               # <<< CHANGED (was groupby test y_bucket_id) >>>
+        .agg(["min", "max"])
+    )
+
+    data_test_full['y_bucket'] = data_test_full['y_bucket_id'].map(
+        lambda x: f"({proba_bounds.loc[x, 'min']:.2f}, {proba_bounds.loc[x, 'max']:.2f}]"
+    )
+
+    data_test_full['x_bucket'] = data_test_full['x_bucket'].apply(
+        lambda x: f"[{x.left:.0f}, {x.right:.0f}]"
+    )
+
+    # -------------------------
+    # Heatmap + population
+    # -------------------------
+    heatmap_data = data_test_full.groupby(['y_bucket', 'x_bucket'])[target_column].mean().unstack()
+    population_data = data_test_full.groupby(['y_bucket', 'x_bucket']).size().unstack()
+
+    heatmap_data = heatmap_data.iloc[::-1]
+    population_data = population_data.iloc[::-1]
+
+    combined_data = heatmap_data.copy()
+    for i in range(heatmap_data.shape[0]):
+        for j in range(heatmap_data.shape[1]):
+            target_rate = heatmap_data.iloc[i, j]
+            population = population_data.iloc[i, j]
+            combined_data.iloc[i, j] = f"{target_rate:.2f}\n(n={population})"
+
+    plt.figure(figsize=(12, 6))
+    sns.heatmap(
+        heatmap_data,
+        annot=combined_data,
+        fmt="",
+        cmap="YlGnBu",
+        cbar_kws={'label': 'Average Target Rate per Cell'}
+    )
+
+    plt.title("Target Rate Heatmap")
+    plt.xlabel("Outstanding Debt Amount (higher = more debt)")
+    plt.ylabel("Model Probability (higher = more risk)")
+    plt.show()
+
+
+
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
