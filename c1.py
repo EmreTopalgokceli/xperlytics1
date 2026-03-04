@@ -3,6 +3,155 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+def generate_target_rate_heatmap(
+    data_test_full,
+    y_proba_oot,
+    target_column,
+    balance_column,
+    cell,
+    data_train,
+    y_proba_train
+):
+
+    # --- TRAIN'den bin edge'leri öğren ---
+    score_edges = pd.Series(y_proba_train).quantile(np.linspace(0, 1, cell + 1)).to_numpy()
+    score_edges = np.unique(score_edges)
+    score_edges[0] = -np.inf
+    score_edges[-1] = np.inf
+
+    bal_edges = pd.Series(data_train[balance_column].abs()).quantile(np.linspace(0, 1, cell + 1)).to_numpy()
+    bal_edges = np.unique(bal_edges)
+    bal_edges[0] = -np.inf
+    bal_edges[-1] = np.inf
+
+    # --- TEST'e bucket uygula ---
+    data_test_full['y_bucket_id'] = pd.cut(
+        y_proba_oot,
+        bins=score_edges,
+        labels=False,
+        include_lowest=True
+    )
+
+    data_test_full['x_bucket'] = pd.cut(
+        data_test_full[balance_column].abs(),
+        bins=bal_edges,
+        include_lowest=True
+    )
+
+    # --- Train'den probability bounds ---
+    y_bucket_id_train = pd.cut(
+        y_proba_train,
+        bins=score_edges,
+        labels=False,
+        include_lowest=True
+    )
+
+    proba_bounds = (
+        pd.DataFrame({'proba': y_proba_train})
+        .groupby(y_bucket_id_train)['proba']
+        .agg(["min", "max"])
+    )
+
+    # --- Label üretimi ---
+    data_test_full['y_bucket'] = data_test_full['y_bucket_id'].map(
+        lambda x: f"({proba_bounds.loc[x,'min']:.2f}, {proba_bounds.loc[x,'max']:.2f}]"
+    )
+
+    data_test_full['x_bucket'] = data_test_full['x_bucket'].apply(
+        lambda x: f"[{x.left:.0f}, {x.right:.0f}]"
+    )
+
+    # --- Heatmap data ---
+    heatmap_data = (
+        data_test_full
+        .groupby(['y_bucket', 'x_bucket'])[target_column]
+        .mean()
+        .unstack()
+    )
+
+    population_data = (
+        data_test_full
+        .groupby(['y_bucket', 'x_bucket'])
+        .size()
+        .unstack()
+    )
+
+    heatmap_data = heatmap_data.iloc[::-1]
+    population_data = population_data.iloc[::-1]
+
+    combined_data = heatmap_data.copy()
+
+    for i in range(heatmap_data.shape[0]):
+        for j in range(heatmap_data.shape[1]):
+            target_rate = heatmap_data.iloc[i, j]
+            population = population_data.iloc[i, j]
+            combined_data.iloc[i, j] = f"{target_rate:.2f}\n(n={population})"
+
+    # --- Heatmap plot ---
+    plt.figure(figsize=(12, 6))
+
+    sns.heatmap(
+        heatmap_data,
+        annot=combined_data,
+        fmt="",
+        cmap="YlGnBu",
+        cbar_kws={'label': 'Average Target Rate per Cell'}
+    )
+
+    plt.title("Target Rate Heatmap")
+    plt.xlabel("Outstanding Debt Amount (higher = more debt)")
+    plt.ylabel("Model Probability (higher = more risk)")
+    plt.show()
+
+    # --- Univariate: score bucket ---
+    score_univariate = (
+        data_test_full
+        .groupby("y_bucket")[target_column]
+        .agg(avg_target="mean", n="size")
+        .sort_index()
+    )
+
+    # --- Score plot ---
+    plt.figure(figsize=(8,4))
+    sns.barplot(
+        x=score_univariate.index,
+        y=score_univariate["avg_target"]
+    )
+    plt.xticks(rotation=45)
+    plt.title("Average Target Rate by Score Bucket")
+    plt.ylabel("Average Target Rate")
+    plt.xlabel("Model Probability Bucket")
+    plt.show()
+
+    # --- Univariate: outstanding bucket ---
+    out_univariate = (
+        data_test_full
+        .groupby("x_bucket")[target_column]
+        .agg(avg_target="mean", n="size")
+        .sort_index()
+    )
+
+    # --- Outstanding plot ---
+    plt.figure(figsize=(8,4))
+    sns.barplot(
+        x=out_univariate.index,
+        y=out_univariate["avg_target"]
+    )
+    plt.xticks(rotation=45)
+    plt.title("Average Target Rate by Outstanding Bucket")
+    plt.ylabel("Average Target Rate")
+    plt.xlabel("Outstanding Debt Bucket")
+    plt.show()
+
+    return heatmap_data, population_data, score_univariate, out_univariate
+
+
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 def quadrant_mats_amount_weighted(
     df: pd.DataFrame,
     proba: pd.Series,
