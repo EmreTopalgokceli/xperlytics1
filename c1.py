@@ -1,3 +1,28 @@
+train_bucketed = bucketing_process.fit_transform(df[["prob"]], df["target"])
+test_bucketed = bucketing_process.transform(pd.DataFrame({"prob": y_proba_oot}))
+
+data_train["risk_bucket"] = train_bucketed["prob"]
+data_test["risk_bucket"] = test_bucketed["prob"]
+
+bucket_order = (
+    data_train.groupby("risk_bucket")["target"]
+    .mean()
+    .sort_values()
+    .index.tolist()
+)
+
+label_map = {
+    bucket_order[0]: "LOW",
+    bucket_order[1]: "MEDIUM",
+    bucket_order[2]: "HIGH"
+}
+
+data_train["risk_segment"] = data_train["risk_bucket"].map(label_map)
+data_test["risk_segment"] = data_test["risk_bucket"].map(label_map)
+
+
+
+
 import numpy as np  # <<< ADDED >>>
 import pandas as pd
 import seaborn as sns
