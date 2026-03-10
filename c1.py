@@ -1,3 +1,160 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# df: dataframe
+# y_true : actual rollover (0/1)
+# y_prob : predicted probability
+
+df_sorted = df.sort_values("y_prob", ascending=False).reset_index(drop=True)
+
+# calls
+df_sorted["calls"] = np.arange(1, len(df_sorted)+1)
+
+# model capture
+df_sorted["model_capture"] = df_sorted["y_true"].cumsum()
+
+# random capture
+total_rollovers = df["y_true"].sum()
+df_sorted["random_capture"] = df_sorted["calls"] * (total_rollovers / len(df))
+
+# perfect capture
+perfect_sorted = df.sort_values("y_true", ascending=False).reset_index(drop=True)
+perfect_capture = perfect_sorted["y_true"].cumsum()
+
+# plot
+plt.figure(figsize=(7,5))
+
+plt.plot(df_sorted["calls"], df_sorted["model_capture"], label="Model", linewidth=3)
+plt.plot(df_sorted["calls"], df_sorted["random_capture"], label="Random", linestyle="--")
+plt.plot(df_sorted["calls"], perfect_capture, label="Perfect", linestyle=":")
+
+plt.xlabel("Number of Calls")
+plt.ylabel("Rollovers Captured")
+plt.title("Capture Efficiency Curve")
+plt.legend()
+plt.show()
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# df içinde:
+# y_true  -> actual rollover (0/1)
+# y_prob  -> predicted probability
+
+# Sort by model probability descending
+df_sorted = df.sort_values("y_prob", ascending=False).reset_index(drop=True)
+
+# Number of customers contacted
+df_sorted["n_contacted"] = np.arange(1, len(df_sorted) + 1)
+
+# Model: cumulative rollovers captured
+df_sorted["model_captured"] = df_sorted["y_true"].cumsum()
+
+# Random line: average rollover rate * number contacted
+avg_rollover_rate = df["y_true"].mean()
+df_sorted["random_captured"] = df_sorted["n_contacted"] * avg_rollover_rate
+
+# Optional: if you want fewer points on the chart
+step = 100
+plot_df = df_sorted.iloc[::step, :].copy()
+
+# make sure last point is included
+if plot_df.index[-1] != df_sorted.index[-1]:
+    plot_df = pd.concat([plot_df, df_sorted.iloc[[-1]]])
+
+# Plot
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    plot_df["n_contacted"],
+    plot_df["model_captured"],
+    marker="o",
+    label="Model"
+)
+
+plt.plot(
+    plot_df["n_contacted"],
+    plot_df["random_captured"],
+    linestyle="--",
+    marker="o",
+    label="Random"
+)
+
+plt.xlabel("Number of Customers Contacted")
+plt.ylabel("Rollovers Captured")
+plt.title("Capture Curve: Model vs Random")
+plt.legend()
+plt.grid(alpha=0.3)
+plt.show()
+
+
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# df içinde
+# y_true  -> actual rollover (0/1)
+# y_prob  -> predicted probability
+
+# Sort by probability
+df_sorted = df.sort_values("y_prob", ascending=False).reset_index(drop=True)
+
+# Number of customers contacted
+df_sorted["customers_contacted"] = np.arange(1, len(df_sorted)+1)
+
+# Model capture
+df_sorted["model_captured"] = df_sorted["y_true"].cumsum()
+
+# Random capture
+avg_rollover_rate = df["y_true"].mean()
+df_sorted["random_captured"] = df_sorted["customers_contacted"] * avg_rollover_rate
+
+# Sampling points to make the chart cleaner
+step = 50
+plot_df = df_sorted.iloc[::step].copy()
+
+# Ensure last point included
+if plot_df.index[-1] != df_sorted.index[-1]:
+    plot_df = pd.concat([plot_df, df_sorted.iloc[[-1]]])
+
+# Plot
+plt.figure(figsize=(9,6))
+
+plt.plot(
+    plot_df["customers_contacted"],
+    plot_df["model_captured"],
+    marker="o",
+    linewidth=2.5,
+    label="Model"
+)
+
+plt.plot(
+    plot_df["customers_contacted"],
+    plot_df["random_captured"],
+    linestyle="--",
+    linewidth=2,
+    label="Random"
+)
+
+plt.xlabel("Number of Customers Contacted", fontsize=12)
+plt.ylabel("Rollovers Captured", fontsize=12)
+plt.title("Model Prioritization vs Random Contacting", fontsize=14)
+
+plt.grid(alpha=0.25)
+plt.legend()
+plt.tight_layout()
+
+plt.show()
+
+
+
+
+
 train_bucketed = bucketing_process.fit_transform(df[["prob"]], df["target"])
 test_bucketed = bucketing_process.transform(pd.DataFrame({"prob": y_proba_oot}))
 
