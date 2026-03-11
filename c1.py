@@ -1,3 +1,93 @@
+from matplotlib.colors import ListedColormap
+
+# Annotation ve decision matrix
+combined_data = heatmap_data.copy()
+decision_matrix = heatmap_data.copy()
+
+for i in range(heatmap_data.shape[0]):
+    for j in range(heatmap_data.shape[1]):
+
+        target_rate = heatmap_data.iloc[i, j]
+        population = population_data.iloc[i, j]
+
+        risk = heatmap_data.index[i]
+        amount = heatmap_data.columns[j]
+
+        # decision rule
+        if risk == "HIGH":
+            decision = "CALL"
+            code = 2
+        elif risk == "MEDIUM" and j == heatmap_data.shape[1] - 1:
+            decision = "CALL"
+            code = 2
+        elif risk == "LOW":
+            decision = "NO CALL"
+            code = 0
+        else:
+            decision = "REVIEW"
+            code = 1
+
+        combined_data.iloc[i, j] = (
+            f"{decision}\n"
+            f"Rollover rate: {target_rate:.0%}\n"
+            f"n={population}"
+        )
+
+        decision_matrix.iloc[i, j] = code
+
+
+# ING colors
+ing_cmap = ListedColormap([
+    "#e6e6e6",  # NO CALL
+    "#ff7f0e",  # REVIEW
+    "#1f77b4"   # CALL
+])
+
+plt.figure(figsize=(9,6))
+
+ax = sns.heatmap(
+    decision_matrix.astype(int),
+    annot=combined_data,
+    fmt="",
+    cmap=ing_cmap,
+    cbar=False,
+    annot_kws={"size":11}
+)
+
+# X axis labels
+ax.set_xticklabels(
+    ["Low", "Medium", "High"],
+    fontsize=12
+)
+
+# Y axis labels
+ax.set_yticklabels(
+    ["Low", "Medium", "High"],
+    fontsize=12,
+    rotation=0
+)
+
+ax.set_xlabel(
+    "Outstanding Principal Amount",
+    fontsize=13
+)
+
+ax.set_ylabel(
+    "Model Probability (Risk Level)",
+    fontsize=13
+)
+
+ax.set_title(
+    "Call Prioritization Strategy (Risk × Exposure)",
+    fontsize=14
+)
+
+plt.tight_layout()
+plt.show()
+
+
+
+
 combined_data = heatmap_data.copy()
 
 for i in range(heatmap_data.shape[0]):
