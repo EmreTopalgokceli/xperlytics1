@@ -1,5 +1,54 @@
 from matplotlib.colors import ListedColormap
 
+combined_data = heatmap_data.copy()
+decision_matrix = heatmap_data.copy()
+
+for i in range(heatmap_data.shape[0]):
+    for j in range(heatmap_data.shape[1]):
+        target_rate = heatmap_data.iloc[i, j]
+        population = population_data.iloc[i, j]
+        risk = heatmap_data.index[i]
+
+        if risk == "HIGH" and j == 0:
+            decision, code = "REVIEW", 1
+        elif risk == "HIGH":
+            decision, code = "CALL", 2
+        elif risk == "MEDIUM" and j == heatmap_data.shape[1] - 1:
+            decision, code = "CALL", 2
+        elif risk == "LOW":
+            decision, code = "NO CALL", 0
+        else:
+            decision, code = "REVIEW", 1
+
+        combined_data.iloc[i, j] = f"{decision}\nRollover rate: {target_rate:.0%}\nn={population}"
+        decision_matrix.iloc[i, j] = code
+
+ing_cmap = ListedColormap(["#e6e6e6", "#ff7f0e", "#1f77b4"])
+
+ax = sns.heatmap(
+    decision_matrix.astype(int).iloc[::-1],   # y-axis ters
+    annot=combined_data.iloc[::-1],
+    fmt="",
+    cmap=ing_cmap,
+    cbar=False,
+    linewidths=1.5,
+    linecolor="white",
+    linestyle="--"
+)
+
+ax.set_xticklabels(["Low", "Medium", "High"], fontsize=12)
+ax.set_yticklabels(["Low", "Medium", "High"], fontsize=12, rotation=0)
+
+plt.title("Call Prioritization Strategy (Risk × Exposure)")
+plt.xlabel("Outstanding Principal Amount")
+plt.ylabel("Model Probability (Risk Level)")
+plt.show()
+
+
+
+
+from matplotlib.colors import ListedColormap
+
 # Annotation ve decision matrix
 combined_data = heatmap_data.copy()
 decision_matrix = heatmap_data.copy()
