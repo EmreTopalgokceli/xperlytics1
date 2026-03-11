@@ -1,3 +1,32 @@
+combined_data = heatmap_data.copy()
+
+for i in range(heatmap_data.shape[0]):
+    for j in range(heatmap_data.shape[1]):
+
+        target_rate = heatmap_data.iloc[i, j]
+        population = population_data.iloc[i, j]
+
+        risk = heatmap_data.index[i]
+        amount = heatmap_data.columns[j]
+
+        # decision rule
+        if risk == "HIGH":
+            decision = "CALL"
+        elif risk == "MEDIUM" and j == heatmap_data.shape[1] - 1:   # high amount column
+            decision = "CALL"
+        elif risk == "LOW":
+            decision = "NO CALL"
+        else:
+            decision = "REVIEW"
+
+        combined_data.iloc[i, j] = (
+            f"{decision}\n"
+            f"Rollover rate: {target_rate:.0%}\n"
+            f"n={population}"
+        )
+
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 
