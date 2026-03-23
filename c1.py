@@ -1,3 +1,88 @@
+import json
+from pathlib import Path
+from sklearn.preprocessing import LabelEncoder
+
+# -----------------------------
+# Save folder
+# -----------------------------
+results_dir = repo_root / "notebooks" / "model_experiment_results"
+results_dir.mkdir(parents=True, exist_ok=True)
+
+# -----------------------------
+# Feature sets from SHAP report
+# -----------------------------
+feature_sizes = [21, 17, 14, 12]
+
+feature_sets = {}
+for n in feature_sizes:
+    row = shap_obj.report_df.loc[shap_obj.report_df["num_features"] == n]
+    if row.empty:
+        raise ValueError(f"No row found in shap_obj.report_df for num_features={n}")
+    feature_sets[f"top_{n}"] = row.iloc[0]["features_set"]
+
+# -----------------------------
+# Run tuning for each feature set
+# -----------------------------
+all_tuning_results = {}
+
+for feature_set_name, selected_features in feature_sets.items():
+    save_path = results_dir / f"{feature_set_name}_tuning.json"
+    
+    # If already saved, load and skip tuning
+    if save_path.exists():
+        with open(save_path, "r") as f:
+            saved_result = json.load(f)
+        all_tuning_results[feature_set_name] = saved_result
+        print(f"{feature_set_name}: loaded from file")
+        continue
+
+    print(f"{feature_set_name}: tuning started")
+
+    # fresh pipeline
+    model_pipeline = get_estimator_pipeline(
+        model_class=LGBMClassifier,
+        model_params=dict(),
+        seed=fixed_model_params.seed
+    )
+
+    tuner = HyperParameterTuning(
+        model=model_pipeline[-1],
+        config=hyper_param_tuning_config,
+        estimator_name=estimator_name
+    )
+
+    # data prep
+    y_data = data[FeatureMatrixSchema.target]
+    x_data = data[selected_features].copy()
+
+    groups = LabelEncoder().fit_transform(data[BasePandasSchema.customer_id])
+
+    x_data = model_pipeline[:-1].fit_transform(x_data)
+
+    # tune
+    tuner.tune(X=x_data, y=y_data, groups=groups)
+    best_params = tuner.get_best_trial_params()
+    average_scores = tuner.get_average_score()
+
+    result_to_save = {
+        "feature_set_name": feature_set_name,
+        "n_features": len(selected_features),
+        "features": selected_features,
+        "best_params": best_params,
+        "average_scores": average_scores.model_dump() if hasattr(average_scores, "model_dump") else str(average_scores),
+    }
+
+    with open(save_path, "w") as f:
+        json.dump(result_to_save, f, indent=2)
+
+    all_tuning_results[feature_set_name] = result_to_save
+    print(f"{feature_set_name}: tuning completed and saved")
+
+print("Done.")
+
+
+
+
 from matplotlib.colors import ListedColormap
 
 combined_data = heatmap_data.copy()
