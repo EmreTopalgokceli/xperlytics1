@@ -1,4 +1,64 @@
 import json
+from sklearn.metrics import roc_auc_score
+
+results_dir = repo_root / "notebooks" / "model_experiment_results"
+
+feature_set_names = ["top_21", "top_17", "top_14", "top_12"]
+
+feature_set_eval_results = {}
+
+for feature_set_name in feature_set_names:
+    save_path = results_dir / f"{feature_set_name}_tuning.json"
+
+    with open(save_path, "r") as f:
+        tuned_result = json.load(f)
+
+    selected_features = tuned_result["features"]
+    best_params = tuned_result["best_params"]
+    average_scores = tuned_result["average_scores"]
+
+    # Train data
+    X_train_fs = train[selected_features]
+    y_train_fs = train[FeatureMatrixSchema.target]
+
+    # OOT data
+    X_oot_fs = test[selected_features]
+    y_oot_fs = test[FeatureMatrixSchema.target]
+
+    # Final model
+    model_fs = get_estimator_pipeline(
+        model_class=LGBMClassifier,
+        model_params=best_params,
+        seed=fixed_model_params.seed
+    )
+
+    # Fit on full train
+    model_fs.fit(X=X_train_fs, y=y_train_fs)
+
+    # OOT prediction
+    y_oot_pred_proba = model_fs.predict_proba(X_oot_fs)[:, 1]
+    oot_auc = roc_auc_score(y_oot_fs, y_oot_pred_proba)
+
+    feature_set_eval_results[feature_set_name] = {
+        "n_features": len(selected_features),
+        "features": selected_features,
+        "best_params": best_params,
+        "cv_average_scores": average_scores,
+        "oot_auc": oot_auc,
+    }
+
+    print(f"{feature_set_name}")
+    print(f"CV Average Scores: {average_scores}")
+    print(f"OOT ROC AUC: {oot_auc:.3f}")
+    print("-" * 40)
+
+
+
+
+
+
+
+import json
 from pathlib import Path
 from sklearn.preprocessing import LabelEncoder
 
